@@ -244,7 +244,7 @@ const styles = StyleSheet.create({
     padding: 16,
   },
   sosMapWrap: {
-    height: 160,
+    height: 220,
     width: '100%',
     borderRadius: 18,
     overflow: 'hidden',

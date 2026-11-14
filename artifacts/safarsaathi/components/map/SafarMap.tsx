@@ -68,12 +68,8 @@ export default function SafarMap({
     ? { lat: userLocation.lat, lng: userLocation.lng }
     : center;
 
-  // Generate initial map HTML with Leaflet and CartoDB Voyager Google Maps-style tiles
+  // Generate initial map HTML with Leaflet and authentic Google Maps tiles + OSM fallback
   const mapHtml = useMemo(() => {
-    const tileUrl = internalNightMode
-      ? 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png'
-      : 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png';
-
     return `
 <!DOCTYPE html>
 <html>
@@ -88,12 +84,17 @@ export default function SafarMap({
       height: 100%;
       margin: 0;
       padding: 0;
-      background: ${internalNightMode ? '#0A0D18' : '#E8ECEF'};
+      background: ${internalNightMode ? '#101426' : '#E8ECEF'};
       overflow: hidden;
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
     }
     .leaflet-control-zoom, .leaflet-control-attribution {
       display: none !important;
+    }
+
+    /* Google Maps Dark Mode in Night View */
+    body.night-mode #map .leaflet-tile {
+      filter: invert(100%) hue-rotate(180deg) brightness(85%) contrast(90%);
     }
 
     /* Google Maps Blue Location Marker */
@@ -195,7 +196,7 @@ export default function SafarMap({
     }
   </style>
 </head>
-<body>
+<body class="${internalNightMode ? 'night-mode' : ''}">
   <div id="map"></div>
   <script>
     var map = L.map('map', {
@@ -208,11 +209,31 @@ export default function SafarMap({
       doubleClickZoom: ${interactive},
       scrollWheelZoom: ${interactive}
     });
+    window.map = map;
 
-    var tileLayer = L.tileLayer('${tileUrl}', {
-      subdomains: ['a', 'b', 'c', 'd'],
-      maxZoom: 19
+    // Real Google Maps Road Layer with high-speed subdomains and OSM live fallback
+    var tileLayer = L.tileLayer('https://mt{s}.google.com/vt/lyrs=m&x={x}&y={y}&z={z}', {
+      subdomains: ['0', '1', '2', '3'],
+      maxZoom: 20
     }).addTo(map);
+
+    tileLayer.on('tileerror', function(error, tile) {
+      if (!tile._fallback) {
+        tile._fallback = true;
+        tile.src = 'https://tile.openstreetmap.org/' + error.coords.z + '/' + error.coords.x + '/' + error.coords.y + '.png';
+      }
+    });
+    window.tileLayer = tileLayer;
+
+    window.setNightMode = function(isNight) {
+      if (isNight) {
+        document.body.classList.add('night-mode');
+        document.body.style.background = '#101426';
+      } else {
+        document.body.classList.remove('night-mode');
+        document.body.style.background = '#E8ECEF';
+      }
+    };
 
     var userMarker = null;
     var destMarker = null;
@@ -372,10 +393,11 @@ export default function SafarMap({
         map.panTo([data.center.lat, data.center.lng], { animate: true, duration: 0.5 });
       }
     }
+    window.updateMap = updateMap;
 
-    window.addEventListener('message', function(e) {
+    function handleIncomingMessage(raw) {
       try {
-        var msg = JSON.parse(e.data);
+        var msg = typeof raw === 'string' ? JSON.parse(raw) : raw;
         if (msg.type === 'init' || msg.type === 'update') {
           updateMap(msg.payload);
         } else if (msg.type === 'fly_to') {
@@ -384,23 +406,18 @@ export default function SafarMap({
           map.zoomIn();
         } else if (msg.type === 'zoom_out') {
           map.zoomOut();
+        } else if (msg.type === 'set_night_mode') {
+          if (window.setNightMode) window.setNightMode(msg.isNight);
         }
       } catch(err) {}
+    }
+
+    window.addEventListener('message', function(e) {
+      handleIncomingMessage(e.data);
     });
 
     document.addEventListener('message', function(e) {
-      try {
-        var msg = JSON.parse(e.data);
-        if (msg.type === 'init' || msg.type === 'update') {
-          updateMap(msg.payload);
-        } else if (msg.type === 'fly_to') {
-          map.flyTo([msg.lat, msg.lng], msg.zoom || 15, { duration: 0.8 });
-        } else if (msg.type === 'zoom_in') {
-          map.zoomIn();
-        } else if (msg.type === 'zoom_out') {
-          map.zoomOut();
-        }
-      } catch(err) {}
+      handleIncomingMessage(e.data);
     });
 
     post('map_ready');
@@ -516,7 +533,11 @@ export default function SafarMap({
         {/* Top Right: Night / Day toggle */}
         <TouchableOpacity
           style={styles.controlBtn}
-          onPress={() => setInternalNightMode(!internalNightMode)}
+          onPress={() => {
+            const nextMode = !internalNightMode;
+            setInternalNightMode(nextMode);
+            webViewRef.current?.injectJavaScript(`if(window.setNightMode) window.setNightMode(${nextMode}); true;`);
+          }}
           activeOpacity={0.8}
         >
           <Feather
