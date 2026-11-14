@@ -4,7 +4,8 @@
   "private": true,
   "main": "expo-router/entry",
   "scripts": {
-    "dev": "expo start --dev-client",
+    "dev": "expo start",
+    "dev:clean": "expo start -c",
     "android": "expo run:android",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "ios": "expo run:ios"
