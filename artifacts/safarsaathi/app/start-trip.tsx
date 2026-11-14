@@ -42,6 +42,7 @@ export default function StartTripScreen() {
   const [routePts, setRoutePts] = useState<LatLng[]>([]);
   const [durationSec, setDurationSec] = useState(0);
   const [distanceM, setDistanceM] = useState(0);
+  const [directDistanceM, setDirectDistanceM] = useState(0);
   const [calculatingRoute, setCalculatingRoute] = useState(false);
   const [starting, setStarting] = useState(false);
 
@@ -94,6 +95,7 @@ export default function StartTripScreen() {
       setRoutePts(routeRes.routePoints);
       setDistanceM(routeRes.distanceM);
       setDurationSec(routeRes.durationSec);
+      setDirectDistanceM(routeRes.directDistanceM);
     } finally {
       setCalculatingRoute(false);
     }
@@ -245,7 +247,7 @@ export default function StartTripScreen() {
                             item.distanceKm < 3 && styles.distancePillTextNear,
                           ]}>
                             {item.distanceKm < 1
-                              ? `${Math.round(item.distanceKm * 1000)} m`
+                              ? `${Math.round(item.distanceKm * 1000)} m direct`
                               : `${item.distanceKm.toFixed(1)} km`}
                           </Text>
                         </View>
@@ -278,7 +280,14 @@ export default function StartTripScreen() {
             <>
               <View style={styles.statsRow}>
                 <Text style={styles.statLabel}>{t('trip.estimatedDistance')}</Text>
-                <Text style={styles.statValue}>{(distanceM / 1000).toFixed(1)} km</Text>
+                <View style={{ alignItems: 'flex-end' }}>
+                  <Text style={styles.statValue}>{(distanceM / 1000).toFixed(1)} km road</Text>
+                  {directDistanceM > 0 && Math.abs(distanceM - directDistanceM) > 100 && (
+                    <Text style={styles.directSubText}>
+                      ({directDistanceM < 1000 ? `${directDistanceM}m` : `${(directDistanceM / 1000).toFixed(1)}km`} direct line)
+                    </Text>
+                  )}
+                </View>
               </View>
 
               <View style={styles.statsRow}>
@@ -495,6 +504,12 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: '700',
     color: Palette.primaryText,
+  },
+  directSubText: {
+    fontSize: 11,
+    fontWeight: '500',
+    color: Palette.mutedText,
+    marginTop: 2,
   },
   arrivalHighlight: {
     color: Palette.successGreen,

@@ -24,7 +24,7 @@ export default function StatusChip({ status, score }: StatusChipProps) {
   return (
     <View style={[styles.chip, { backgroundColor: cfg.bg, borderColor: cfg.dot }]} accessibilityLabel={cfg.label}>
       <View style={[styles.dot, { backgroundColor: cfg.dot }]} />
-      <Text style={[styles.text, { color: cfg.fg }]}>
+      <Text style={[styles.text, { color: cfg.fg }]} numberOfLines={1}>
         {cfg.label}
         {typeof score === 'number' && score > 0 ? ` (${score})` : ''}
       </Text>

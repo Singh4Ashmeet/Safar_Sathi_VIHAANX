@@ -21,6 +21,8 @@ import { useTripContext } from '@/context/TripContext';
 import { useRiskState } from '@/services/risk';
 import { getLatestLocation, useTrackingStatus } from '@/services/tracking';
 import { watchLiveLocation, type LocationFix } from '@/services/location.service';
+import { useConnectivityMode } from '@/services/connectivity';
+import { useRelayStatus } from '@/services/relay';
 import { t, useLanguage } from '@/i18n';
 
 export default function LiveTripScreen() {
@@ -37,6 +39,8 @@ export default function LiveTripScreen() {
 
   const tracking = useTrackingStatus();
   const risk = useRiskState();
+  const relay = useRelayStatus();
+  const { isInternetOnline } = useConnectivityMode();
   const [busy, setBusy] = useState(false);
 
   // Live Location stream for real-time map movement
@@ -110,7 +114,7 @@ export default function LiveTripScreen() {
     ? { lat: activeUserCoord.lat, lng: activeUserCoord.lng }
     : routePoints[0] ?? { lat: 28.6139, lng: 77.209 };
 
-  const chipStatus = !tracking.online
+  const chipStatus = !isInternetOnline && !relay.enabled
     ? 'signal_lost'
     : risk.level;
 
@@ -219,8 +223,12 @@ export default function LiveTripScreen() {
           {activeTrip?.destination ?? t('trip.protectedTrip')}
         </Text>
         <Text style={styles.metaText}>
-          {tracking.online ? '● Cloud Sync Active' : '⚡ BLE Mesh Relay Active'} ·{' '}
-          {t('trip.gpsFixes')}: {tracking.pendingPoints} {t('trip.pending')} ·{' '}
+          {relay.enabled
+            ? `⚡ BLE Relay Active · ${relay.peers} peer${relay.peers === 1 ? '' : 's'}`
+            : isInternetOnline
+              ? (tracking.online ? '● Cloud Sync Active' : `● Cloud Syncing (${tracking.pendingPoints} queued)`)
+              : `⚠️ Offline Mode · ${tracking.pendingPoints} ${t('trip.pending')}`}
+          {' · '}
           {tracking.lastFixAt
             ? `${t('trip.fixUpdated')} ${Math.max(0, Math.round((Date.now() - tracking.lastFixAt) / 1000))}s ago`
             : t('trip.acquiring')}

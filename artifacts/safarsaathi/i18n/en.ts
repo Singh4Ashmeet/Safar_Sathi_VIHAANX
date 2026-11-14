@@ -66,7 +66,7 @@ export const en = {
     statusSafe: 'Safe',
     statusWarning: 'Check-in Soon',
     statusDanger: 'Alert Active',
-    statusSignalLost: 'Signal Weak / Queued',
+    statusSignalLost: 'Queued',
     liveJourney: 'Live Journey', activeWatermark: 'Active Live Trip · Encrypted Tracking', protectedTrip: 'Protected Trip',
     gpsFixes: 'GPS Fixes', pending: 'pending', fixUpdated: 'Fix updated', acquiring: 'Acquiring satellite lock',
     liveSharing: 'Live sharing link:', stopSharing: 'Stop Sharing', shareLive: 'Share Live Link', endSafe: 'End Safe Trip', testPrompt: 'Test Check-in Prompt',
