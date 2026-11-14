@@ -8,6 +8,8 @@ export interface TrackingPageData {
   lastSeenAt?: number;
   isExpired: boolean;
   token: string;
+  ridePlate?: string;
+  rideDriver?: string;
 }
 
 /**
@@ -206,6 +208,16 @@ export function renderTrackingPage(data: TrackingPageData): string {
       <span>⚠️ Emergency SOS Alert Triggered!</span>
       <a href="tel:112" class="sos-call-btn">📞 Call Police (112)</a>
     </div>
+
+    ${data.ridePlate ? `
+    <div style="background: rgba(99, 91, 255, 0.15); border-bottom: 1px solid rgba(99, 91, 255, 0.3); padding: 8px 16px; display: flex; align-items: center; justify-content: space-between; font-size: 13px;">
+      <div style="display: flex; align-items: center; gap: 8px;">
+        <span style="font-size: 16px;">🚗</span>
+        <span>Vehicle: <strong style="color: #A78BFA; letter-spacing: 0.5px;">${encodeHtml(data.ridePlate)}</strong>${data.rideDriver ? ` · Driver: <strong>${encodeHtml(data.rideDriver)}</strong>` : ''}</span>
+      </div>
+      <span style="background: rgba(16, 185, 129, 0.2); color: #10B981; padding: 2px 8px; border-radius: 6px; font-size: 11px; font-weight: 700;">VERIFIED RIDE</span>
+    </div>
+    ` : ''}
 
     <noscript>
       <div class="no-js-panel">

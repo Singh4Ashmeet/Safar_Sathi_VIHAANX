@@ -2,7 +2,7 @@ import { router } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import { Share, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Feather } from '@expo/vector-icons';
+import { Feather, Ionicons } from '@expo/vector-icons';
 import {
   createTripShareLink,
   endTrip,
@@ -29,6 +29,7 @@ export default function LiveTripScreen() {
   const insets = useSafeAreaInsets();
   const {
     activeTrip,
+    activeRide,
     routePoints,
     shareUrl,
     setShareUrl,
@@ -69,17 +70,22 @@ export default function LiveTripScreen() {
   const handleShare = async () => {
     if (!activeTrip) return;
     setBusy(true);
+    const rideSuffix = activeRide
+      ? `\n🚗 Vehicle: ${activeRide.plate} (${activeRide.provider || 'Cab'}${activeRide.driverName ? ` · Driver: ${activeRide.driverName}` : ''})`
+      : '';
     try {
       const res = await createTripShareLink(activeTrip.id, {});
       setShareUrl(res.url);
       await Share.share({
-        message: `Track my SafarSaathi journey live: ${res.url}`,
+        message: `Track my SafarSaathi journey live: ${res.url}${rideSuffix}\nDestination: ${activeTrip.destination}`,
       });
     } catch {
       // Demo share link fallback
       const fallback = `https://safarsaathi.in/t/${activeTrip.id.slice(0, 8)}`;
       setShareUrl(fallback);
-      await Share.share({ message: `Track my SafarSaathi journey live: ${fallback}` }).catch(() => undefined);
+      await Share.share({
+        message: `Track my SafarSaathi journey live: ${fallback}${rideSuffix}\nDestination: ${activeTrip.destination}`,
+      }).catch(() => undefined);
     } finally {
       setBusy(false);
     }
@@ -149,6 +155,23 @@ export default function LiveTripScreen() {
         <Text style={styles.destTitle} numberOfLines={1}>
           {activeTrip?.destination ?? t('trip.protectedTrip')}
         </Text>
+
+        {activeRide && (
+          <View style={styles.rideBadgeCard}>
+            <View style={styles.rideBadgeLeft}>
+              <Ionicons name="car-sport" size={18} color={Palette.primaryViolet} />
+              <View>
+                <Text style={styles.rideBadgePlate}>{activeRide.plate}</Text>
+                <Text style={styles.rideBadgeSub}>
+                  {activeRide.provider || 'Cab'}{activeRide.driverName ? ` · Driver: ${activeRide.driverName}` : ''}
+                </Text>
+              </View>
+            </View>
+            <View style={styles.rideBadgeRight}>
+              <Text style={styles.rideBadgeRightText}>✓ Monitored Ride</Text>
+            </View>
+          </View>
+        )}
         <Text style={styles.metaText}>
           {relay.enabled
             ? `⚡ BLE Relay Active · ${relay.peers} peer${relay.peers === 1 ? '' : 's'}`
@@ -267,6 +290,46 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: '700',
     color: Palette.primaryText,
+  },
+  rideBadgeCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: 'rgba(124, 77, 255, 0.08)',
+    borderWidth: 1,
+    borderColor: 'rgba(124, 77, 255, 0.25)',
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    marginTop: 8,
+  },
+  rideBadgeLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    flex: 1,
+  },
+  rideBadgePlate: {
+    fontSize: 14,
+    fontWeight: '800',
+    color: Palette.softLavender,
+    letterSpacing: 0.5,
+  },
+  rideBadgeSub: {
+    fontSize: 11,
+    color: Palette.secondaryText,
+    marginTop: 1,
+  },
+  rideBadgeRight: {
+    backgroundColor: 'rgba(16, 185, 129, 0.15)',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 8,
+  },
+  rideBadgeRightText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: Palette.successGreen,
   },
   metaText: {
     fontSize: 12,

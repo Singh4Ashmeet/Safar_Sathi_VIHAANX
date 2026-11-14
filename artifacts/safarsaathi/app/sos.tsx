@@ -20,7 +20,7 @@ export default function SosActiveScreen() {
   useLanguage();
   const insets = useSafeAreaInsets();
   const params = useLocalSearchParams<{ sosId?: string }>();
-  const { activeSosId, discreetMode } = useTripContext();
+  const { activeSosId, discreetMode, activeRide } = useTripContext();
   const { user } = useAuth();
   const sosId = params.sosId ?? activeSosId ?? '';
 
@@ -95,7 +95,9 @@ export default function SosActiveScreen() {
               onPress={() =>
                 void openDeviceSmsFallback(
                   guardianPhones,
-                  user?.email?.split('@')[0] ?? 'SafarSaathi User'
+                  user?.email?.split('@')[0] ?? 'SafarSaathi User',
+                  undefined,
+                  activeRide
                 )
               }
             >

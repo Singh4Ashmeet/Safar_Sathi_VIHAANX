@@ -33,6 +33,8 @@ publicRouter.get('/t/:token', publicTrackingLimiter, async (req, res, next) => {
       lastSeenAt: tracking.lastSeenAt,
       isExpired: tracking.isExpired,
       token,
+      ridePlate: tracking.ridePlate,
+      rideDriver: tracking.rideDriver,
     }));
   } catch (err) {
     next(err);

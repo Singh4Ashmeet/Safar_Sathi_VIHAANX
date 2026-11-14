@@ -12,7 +12,7 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather, Ionicons } from '@expo/vector-icons';
-import { createTrip } from '@workspace/api-client-react';
+import { createTrip, registerRide } from '@workspace/api-client-react';
 import { type LatLng } from '@workspace/safety-core';
 import BottomNav from '@/components/BottomNav';
 import BrandHeader from '@/components/BrandHeader';
@@ -45,6 +45,11 @@ export default function StartTripScreen() {
   const [directDistanceM, setDirectDistanceM] = useState(0);
   const [calculatingRoute, setCalculatingRoute] = useState(false);
   const [starting, setStarting] = useState(false);
+
+  // Integrated Ride Verification state
+  const [provider, setProvider] = useState('Uber');
+  const [plate, setPlate] = useState('');
+  const [driverName, setDriverName] = useState('');
 
   // Continuous real-time GPS tracking for origin
   useEffect(() => {
@@ -132,6 +137,26 @@ export default function StartTripScreen() {
 
     const finalPts = routePts.length >= 2 ? routePts : [origin, { lat: destLat, lng: destLng }];
 
+    const cleanPlate = plate.trim().toUpperCase();
+    const cleanDriver = driverName.trim();
+    const rideDetails = cleanPlate.length > 0 ? {
+      plate: cleanPlate,
+      driverName: cleanDriver || undefined,
+      provider,
+    } : null;
+
+    if (rideDetails) {
+      try {
+        await registerRide({
+          plate: rideDetails.plate,
+          ...(rideDetails.driverName ? { driverName: rideDetails.driverName } : {}),
+          tripId,
+        });
+      } catch {
+        // Continue with local tracking if backend is offline
+      }
+    }
+
     try {
       const trip = await createTrip({
         tripId,
@@ -142,7 +167,7 @@ export default function StartTripScreen() {
         startedAt: now,
         etaAt,
       });
-      await startProtectedTrip(trip, finalPts);
+      await startProtectedTrip(trip, finalPts, rideDetails);
       router.replace('/trip');
     } catch {
       await startProtectedTrip(
@@ -156,7 +181,8 @@ export default function StartTripScreen() {
           startedAt: now,
           etaAt,
         },
-        finalPts
+        finalPts,
+        rideDetails
       );
       router.replace('/trip');
     } finally {
@@ -300,6 +326,68 @@ export default function StartTripScreen() {
               </View>
             </>
           )}
+
+          {/* Integrated Ride Verification Section */}
+          <View style={styles.rideSection}>
+            <View style={styles.rideSectionHeader}>
+              <View style={styles.rideTitleRow}>
+                <Ionicons name="car-sport" size={17} color={Palette.primaryViolet} />
+                <Text style={styles.rideSectionTitle}>Ride & Vehicle Check</Text>
+              </View>
+              <Text style={styles.rideSectionHint}>Shared with Guardians</Text>
+            </View>
+
+            {/* Provider selection pills */}
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.providerScroll}>
+              {['Uber', 'Ola', 'Rapido', 'Auto / Taxi', 'Bus / Transit', 'Personal'].map((p) => (
+                <TouchableOpacity
+                  key={p}
+                  style={[styles.providerPill, provider === p && styles.providerPillActive]}
+                  onPress={() => setProvider(p)}
+                  activeOpacity={0.7}
+                >
+                  <Text style={[styles.providerText, provider === p && styles.providerTextActive]}>
+                    {p}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+
+            {/* Plate & Driver Inputs */}
+            <View style={styles.rideInputsRow}>
+              <View style={[styles.inputBox, { flex: 1.1 }]}>
+                <Ionicons name="barcode-outline" size={17} color={Palette.mutedText} style={styles.fieldIcon} />
+                <TextInput
+                  style={styles.textInput}
+                  value={plate}
+                  onChangeText={(txt) => setPlate(txt.toUpperCase())}
+                  autoCapitalize="characters"
+                  placeholder="Plate (e.g. DL 1Y AB 1234)"
+                  placeholderTextColor={Palette.mutedText}
+                />
+              </View>
+
+              <View style={[styles.inputBox, { flex: 1 }]}>
+                <Ionicons name="person-outline" size={17} color={Palette.mutedText} style={styles.fieldIcon} />
+                <TextInput
+                  style={styles.textInput}
+                  value={driverName}
+                  onChangeText={setDriverName}
+                  placeholder="Driver (Optional)"
+                  placeholderTextColor={Palette.mutedText}
+                />
+              </View>
+            </View>
+
+            {plate.trim().length > 0 && (
+              <View style={styles.rideVerifiedBanner}>
+                <Feather name="shield" size={13} color={Palette.successGreen} />
+                <Text style={styles.rideVerifiedBannerText}>
+                  Vehicle {plate.trim().toUpperCase()} ({provider}) will be shared in live tracking link
+                </Text>
+              </View>
+            )}
+          </View>
 
           {/* CTA Button */}
           <TouchableOpacity
@@ -513,6 +601,80 @@ const styles = StyleSheet.create({
   },
   arrivalHighlight: {
     color: Palette.successGreen,
+  },
+  // Ride Verification Section Styles
+  rideSection: {
+    marginTop: 18,
+    paddingTop: 14,
+    borderTopWidth: 1,
+    borderTopColor: Palette.borders,
+  },
+  rideSectionHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 10,
+  },
+  rideTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  rideSectionTitle: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: Palette.primaryText,
+  },
+  rideSectionHint: {
+    fontSize: 11,
+    fontWeight: '500',
+    color: Palette.primaryViolet,
+  },
+  providerScroll: {
+    marginBottom: 10,
+  },
+  providerPill: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 14,
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    borderWidth: 1,
+    borderColor: Palette.borders,
+    marginRight: 8,
+  },
+  providerPillActive: {
+    backgroundColor: 'rgba(124, 77, 255, 0.15)',
+    borderColor: Palette.primaryViolet,
+  },
+  providerText: {
+    fontSize: 12,
+    color: Palette.mutedText,
+    fontWeight: '600',
+  },
+  providerTextActive: {
+    color: Palette.softLavender,
+    fontWeight: '700',
+  },
+  rideInputsRow: {
+    flexDirection: 'row',
+    gap: 10,
+  },
+  rideVerifiedBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: 'rgba(16, 185, 129, 0.08)',
+    borderWidth: 1,
+    borderColor: 'rgba(16, 185, 129, 0.25)',
+    borderRadius: 10,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    marginTop: 8,
+  },
+  rideVerifiedBannerText: {
+    fontSize: 11,
+    color: Palette.successGreen,
+    fontWeight: '600',
   },
   beginTripBtn: {
     backgroundColor: Palette.primaryViolet,

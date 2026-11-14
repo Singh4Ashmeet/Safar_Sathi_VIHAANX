@@ -1,4 +1,4 @@
-import { db, shareLinks, trips, guardians, users, tripPoints, sosEvents, SYSTEM_TOMBSTONE_GUARDIAN_ID } from '@workspace/db';
+import { db, shareLinks, trips, guardians, users, tripPoints, sosEvents, rides, SYSTEM_TOMBSTONE_GUARDIAN_ID } from '@workspace/db';
 import { eq, and, sql, desc } from 'drizzle-orm';
 import { AppError } from '../../lib/errors.js';
 import { logger } from '../../lib/logger.js';
@@ -17,6 +17,8 @@ export interface PublicTrackingDetails {
   accuracyM?: number;
   targetId?: string;
   isExpired: boolean;
+  ridePlate?: string;
+  rideDriver?: string;
 }
 
 /**
@@ -98,6 +100,14 @@ export class PublicService {
         .where(eq(users.id, trip.userId))
         .limit(1);
 
+      // Get ride details if registered
+      const [ride] = await db
+        .select({ plate: rides.plate, driverName: rides.driverName })
+        .from(rides)
+        .where(eq(rides.tripId, shareLink.tripId))
+        .orderBy(desc(rides.startedAt))
+        .limit(1);
+
       return {
         userName: tripUser?.name ?? 'A contact',
         tripStatus: trip.status,
@@ -107,6 +117,8 @@ export class PublicService {
         accuracyM: latestPoint?.acc ?? undefined,
         targetId: shareLink.tripId,
         isExpired: false,
+        ridePlate: ride?.plate ?? undefined,
+        rideDriver: ride?.driverName ?? undefined,
       };
     }
 

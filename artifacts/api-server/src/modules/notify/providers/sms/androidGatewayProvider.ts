@@ -18,9 +18,32 @@ export class AndroidGatewayProvider implements SmsProvider {
     }
 
     try {
-      // TODO: Implement HTTP POST call to Android SMS Gateway endpoint
-      // Using basic auth (SMS_GATEWAY_USER, SMS_GATEWAY_PASSWORD) and optional encryption passphrase
-      logger.info({ provider: this.name }, '[SMS Gateway] Queuing SMS to Android Gateway');
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json',
+      };
+      if (env.SMS_GATEWAY_USER || env.SMS_GATEWAY_PASSWORD) {
+        const credentials = Buffer.from(
+          `${env.SMS_GATEWAY_USER || ''}:${env.SMS_GATEWAY_PASSWORD || ''}`
+        ).toString('base64');
+        headers['Authorization'] = `Basic ${credentials}`;
+      }
+
+      const res = await fetch(`${gatewayUrl.replace(/\/+$/, '')}/message`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({
+          phoneNumbers: [options.toPhoneE164],
+          message: options.messageText,
+        }),
+      });
+
+      if (!res.ok) {
+        const text = await res.text().catch(() => '');
+        logger.error({ status: res.status, text }, '[SMS Gateway] HTTP dispatch failed');
+        return { success: false, error: `Gateway HTTP ${res.status}: ${text}` };
+      }
+
+      logger.info({ to: options.toPhoneE164 }, '[SMS Gateway] Successfully dispatched SMS via Android Gateway');
       return {
         success: true,
         providerRef: `gw-${Date.now()}`,

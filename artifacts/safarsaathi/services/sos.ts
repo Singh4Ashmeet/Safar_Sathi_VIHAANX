@@ -203,14 +203,16 @@ export function useSosStatus(sosId: string): {
 export async function openDeviceSmsFallback(
   phones: string[],
   userName: string,
-  trackingUrl?: string
+  trackingUrl?: string,
+  rideInfo?: { plate: string; driverName?: string; provider?: string } | null
 ): Promise<boolean> {
   if (phones.length === 0) return false;
   const cleanPhone = phones[0].replace(/\s+/g, '');
   const loc = getLatestLocation();
   const link =
     trackingUrl ?? (loc ? `https://maps.google.com/?q=${loc.lat},${loc.lng}` : 'Location pending');
-  const body = `SafarSaathi alert: ${userName} may need help. Live location: ${link}. If urgent call 112.`;
+  const rideText = rideInfo ? ` Vehicle: ${rideInfo.plate} (${rideInfo.provider || 'Cab'}${rideInfo.driverName ? `, Driver: ${rideInfo.driverName}` : ''}).` : '';
+  const body = `SafarSaathi EMERGENCY ALERT: ${userName} may need help. Live Map: ${link}.${rideText} If urgent call 112.`;
   const separator = Platform.OS === 'android' ? '?' : '&';
   const url = `sms:${cleanPhone}${separator}body=${encodeURIComponent(body)}`;
   const canOpen = await Linking.canOpenURL(url);
