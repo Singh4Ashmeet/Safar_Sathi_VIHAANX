@@ -162,13 +162,13 @@ describe('FR-05: Watchdog Escalation & Trip Completion Integration', () => {
   });
 
   // ========================================================================
-  // Lost Contact Escalation Tests (Stage 2)
+  // Missed Check-in Escalation Tests (Stage 2 then SOS)
   // ========================================================================
 
-  it('should escalate to guardians_alerted when user does not respond after signal_lost', async () => {
+  it('sends a second check after 30 seconds, then triggers SOS 10 seconds later', async () => {
     const tripId = await createTestTrip({
       escalationStage: 'user_prompted',
-      nextCheckAt: nowEpochMs() - 301000, // Past the lost contact threshold
+      nextCheckAt: nowEpochMs() - 1,
     });
 
     const res = await runWatchdog();
@@ -176,17 +176,27 @@ describe('FR-05: Watchdog Escalation & Trip Completion Integration', () => {
     expect(res.status).toBe(200);
     expect(res.body.escalatedCount).toBeGreaterThanOrEqual(1);
 
-    // Verify guardians_alerted escalation was created
+    // The first missed response sends the second (final) prompt, not SOS.
+    let trip = await db
+      .select()
+      .from(trips)
+      .where(eq(trips.id, tripId))
+      .limit(1);
+    expect(trip[0].escalationStage).toBe('second_prompted');
+    expect(trip[0].nextCheckAt).toBeGreaterThan(nowEpochMs() - 1_000);
+
+    // Expire the final 10-second response window and run the watchdog again.
+    await db.update(trips).set({ nextCheckAt: nowEpochMs() - 1 }).where(eq(trips.id, tripId));
+    await runWatchdog();
+
     const escalation = await db
       .select()
       .from(escalations)
       .where(and(eq(escalations.tripId, tripId), eq(escalations.stage, 'guardians_alerted')))
       .limit(1);
-
     expect(escalation.length).toBe(1);
 
-    // Verify trip was updated
-    const trip = await db
+    trip = await db
       .select()
       .from(trips)
       .where(eq(trips.id, tripId))
@@ -211,9 +221,11 @@ describe('FR-05: Watchdog Escalation & Trip Completion Integration', () => {
   it('should create delivery records for guardians on lost contact escalation', async () => {
     const tripId = await createTestTrip({
       escalationStage: 'user_prompted',
-      nextCheckAt: nowEpochMs() - 301000,
+      nextCheckAt: nowEpochMs() - 1,
     });
 
+    await runWatchdog();
+    await db.update(trips).set({ nextCheckAt: nowEpochMs() - 1 }).where(eq(trips.id, tripId));
     await runWatchdog();
 
     const sos = await db

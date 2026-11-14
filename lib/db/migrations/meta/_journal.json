@@ -43,6 +43,13 @@
       "when": 1794649705311,
       "tag": "0005_sharp_owl",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1794700000000,
+      "tag": "0006_second_safety_check",
+      "breakpoints": true
     }
   ]
 }

@@ -1,5 +1,6 @@
 import React, { createContext, useCallback, useContext, useEffect, useState } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { router } from 'expo-router';
 import type { LatLng } from '@workspace/safety-core';
 import type { Trip } from '@workspace/api-client-react';
 import * as trackingService from '@/services/tracking';
@@ -25,6 +26,7 @@ interface TripContextValue {
   setNightTheme: (on: boolean) => void;
   startProtectedTrip: (trip: Trip, routePoints: LatLng[]) => Promise<void>;
   stopProtectedTrip: () => Promise<void>;
+  confirmSafetyCheck: () => void;
   triggerSosFlow: (trigger: 'button' | 'shake' | 'prompt_timeout') => Promise<string>;
 }
 
@@ -38,6 +40,8 @@ export function TripProvider({ children }: { children: React.ReactNode }) {
   const [shareUrl, setShareUrl] = useState<string | null>(null);
   const [discreetMode, setDiscreetModeState] = useState(false);
   const [nightTheme, setNightTheme] = useState(false);
+  const [nextSafetyCheck, setNextSafetyCheck] = useState(1);
+  const [pendingSafetyCheck, setPendingSafetyCheck] = useState<number | null>(null);
 
   // Load persisted discreet mode preference on mount
   useEffect(() => {
@@ -66,6 +70,8 @@ export function TripProvider({ children }: { children: React.ReactNode }) {
   const setActiveTripSession = useCallback((trip: Trip | null, pts: LatLng[] = []) => {
     setActiveTrip(trip);
     setRoutePoints(pts);
+    setNextSafetyCheck(1);
+    setPendingSafetyCheck(null);
     setRiskContext(pts, []);
   }, []);
 
@@ -73,6 +79,8 @@ export function TripProvider({ children }: { children: React.ReactNode }) {
     setActiveTrip(trip);
     setRoutePoints(pts);
     setShareUrl(null);
+    setNextSafetyCheck(1);
+    setPendingSafetyCheck(null);
     setRiskContext(pts, []);
     await trackingService.start(trip.id);
   }, []);
@@ -83,7 +91,34 @@ export function TripProvider({ children }: { children: React.ReactNode }) {
     setActiveTrip(null);
     setRoutePoints([]);
     setShareUrl(null);
+    setPendingSafetyCheck(null);
+    setNextSafetyCheck(1);
   }, []);
+
+  // Divide the planned ride duration into six equal safety-check intervals.
+  // The prompt owns the two response windows (30s, then 10s); confirmation
+  // advances to the following interval while the trip remains protected.
+  useEffect(() => {
+    if (!activeTrip || pendingSafetyCheck !== null || nextSafetyCheck > 6) return;
+    if (!activeTrip.etaAt || activeTrip.etaAt <= activeTrip.startedAt) return;
+
+    const intervalMs = (activeTrip.etaAt - activeTrip.startedAt) / 6;
+    const dueAt = activeTrip.startedAt + intervalMs * nextSafetyCheck;
+    const timeout = setTimeout(() => {
+      setPendingSafetyCheck(nextSafetyCheck);
+      // The timer is deliberately routed through the existing prompt screen;
+      // its expiry continues through the unchanged SOS trigger flow.
+      router.push({ pathname: '/prompt', params: { check: String(nextSafetyCheck) } });
+    }, Math.max(0, dueAt - Date.now()));
+
+    return () => clearTimeout(timeout);
+  }, [activeTrip, nextSafetyCheck, pendingSafetyCheck]);
+
+  const confirmSafetyCheck = useCallback(() => {
+    if (pendingSafetyCheck === null) return;
+    setNextSafetyCheck((current) => Math.max(current, pendingSafetyCheck + 1));
+    setPendingSafetyCheck(null);
+  }, [pendingSafetyCheck]);
 
   const handleSetActiveSosId = useCallback((sosId: string | null) => {
     setActiveSosId(sosId);
@@ -124,6 +159,7 @@ export function TripProvider({ children }: { children: React.ReactNode }) {
         setNightTheme,
         startProtectedTrip,
         stopProtectedTrip,
+        confirmSafetyCheck,
         triggerSosFlow,
       }}
     >
