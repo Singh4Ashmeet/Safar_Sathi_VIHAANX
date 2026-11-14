@@ -112,44 +112,83 @@ export function formatAccuracy(accuracy?: number): string {
 
 /**
  * Watch real-time GPS position stream continuously.
+ * Immediately fetches last known position and current position for instant 0s lock,
+ * then streams updates continuously every 1-2s and on 1m movement.
  */
 export function watchLiveLocation(
   onFix: (fix: LocationFix) => void,
-  intervalMs = 2500
+  intervalMs = 2000
 ): () => void {
   let sub: Location.LocationSubscription | null = null;
   let cancelled = false;
 
-  Location.requestForegroundPermissionsAsync().then(({ status }) => {
+  Location.requestForegroundPermissionsAsync().then(async ({ status }) => {
     if (status !== 'granted' || cancelled) return;
 
-    Location.watchPositionAsync(
-      {
-        accuracy: Location.Accuracy.High,
-        timeInterval: intervalMs,
-        distanceInterval: 4,
-      },
-      (loc) => {
-        if (cancelled) return;
-        const timestamp = loc.timestamp || Date.now();
+    // 1. Instant fix from last known position (< 50ms)
+    try {
+      const last = await Location.getLastKnownPositionAsync();
+      if (last && !cancelled) {
         onFix({
-          lat: loc.coords.latitude,
-          lng: loc.coords.longitude,
-          accuracy: loc.coords.accuracy ?? undefined,
-          altitude: loc.coords.altitude ?? undefined,
-          speed: loc.coords.speed ?? undefined,
-          heading: loc.coords.heading ?? undefined,
-          timestamp,
+          lat: last.coords.latitude,
+          lng: last.coords.longitude,
+          accuracy: last.coords.accuracy ?? undefined,
+          altitude: last.coords.altitude ?? undefined,
+          speed: last.coords.speed ?? undefined,
+          heading: last.coords.heading ?? undefined,
+          timestamp: last.timestamp || Date.now(),
           isStale: false,
         });
       }
-    ).then((s) => {
-      if (cancelled) {
-        s.remove();
-      } else {
-        sub = s;
+    } catch {}
+
+    // 2. High-accuracy immediate fix
+    try {
+      const current = await Location.getCurrentPositionAsync({
+        accuracy: Location.Accuracy.High,
+      });
+      if (current && !cancelled) {
+        onFix({
+          lat: current.coords.latitude,
+          lng: current.coords.longitude,
+          accuracy: current.coords.accuracy ?? undefined,
+          altitude: current.coords.altitude ?? undefined,
+          speed: current.coords.speed ?? undefined,
+          heading: current.coords.heading ?? undefined,
+          timestamp: current.timestamp || Date.now(),
+          isStale: false,
+        });
       }
-    }).catch(() => undefined);
+    } catch {}
+
+    if (cancelled) return;
+
+    // 3. Continuous watcher (1-meter threshold for walking/moving)
+    try {
+      sub = await Location.watchPositionAsync(
+        {
+          accuracy: Location.Accuracy.High,
+          timeInterval: intervalMs,
+          distanceInterval: 1, // 1 meter movement threshold
+        },
+        (loc) => {
+          if (cancelled) return;
+          const timestamp = loc.timestamp || Date.now();
+          onFix({
+            lat: loc.coords.latitude,
+            lng: loc.coords.longitude,
+            accuracy: loc.coords.accuracy ?? undefined,
+            altitude: loc.coords.altitude ?? undefined,
+            speed: loc.coords.speed ?? undefined,
+            heading: loc.coords.heading ?? undefined,
+            timestamp,
+            isStale: false,
+          });
+        }
+      );
+    } catch (err) {
+      console.warn('[LocationService] watchPositionAsync error:', err);
+    }
   }).catch(() => undefined);
 
   return () => {

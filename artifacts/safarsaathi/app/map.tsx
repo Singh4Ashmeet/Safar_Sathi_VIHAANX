@@ -191,11 +191,30 @@ export default function SafetyMapScreen() {
                 onPress={() => handleSelectPlace(item)}
                 activeOpacity={0.7}
               >
-                <Ionicons name="location-sharp" size={18} color={Palette.primaryViolet} />
+                <View style={styles.resultIconWrap}>
+                  <Ionicons name="location-sharp" size={18} color={Palette.primaryViolet} />
+                </View>
                 <View style={styles.resultTextCol}>
-                  <Text style={styles.resultNameText}>{item.name}</Text>
-                  <Text style={styles.resultLabelText} numberOfLines={1}>
-                    {item.label}
+                  <View style={styles.resultTitleRow}>
+                    <Text style={styles.resultNameText} numberOfLines={1}>{item.name}</Text>
+                    {item.distanceKm !== undefined && (
+                      <View style={[
+                        styles.distancePill,
+                        item.distanceKm < 3 && styles.distancePillNear,
+                      ]}>
+                        <Text style={[
+                          styles.distancePillText,
+                          item.distanceKm < 3 && styles.distancePillTextNear,
+                        ]}>
+                          {item.distanceKm < 1
+                            ? `${Math.round(item.distanceKm * 1000)} m`
+                            : `${item.distanceKm.toFixed(1)} km`}
+                        </Text>
+                      </View>
+                    )}
+                  </View>
+                  <Text style={styles.resultLabelText} numberOfLines={2}>
+                    {item.subLabel || item.label}
                   </Text>
                 </View>
               </TouchableOpacity>
@@ -412,25 +431,61 @@ const styles = StyleSheet.create({
   },
   searchResultItem: {
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     paddingHorizontal: 14,
     paddingVertical: 12,
-    gap: 10,
+    gap: 12,
     borderBottomWidth: 1,
     borderBottomColor: 'rgba(255, 255, 255, 0.06)',
+  },
+  resultIconWrap: {
+    marginTop: 2,
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: 'rgba(124, 77, 255, 0.15)',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   resultTextCol: {
     flex: 1,
   },
+  resultTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 8,
+  },
   resultNameText: {
+    flex: 1,
     fontSize: 14,
     fontWeight: '700',
     color: Palette.primaryText,
   },
-  resultLabelText: {
+  distancePill: {
+    backgroundColor: 'rgba(255, 255, 255, 0.08)',
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 8,
+  },
+  distancePillNear: {
+    backgroundColor: 'rgba(16, 185, 129, 0.2)',
+    borderWidth: 1,
+    borderColor: 'rgba(16, 185, 129, 0.4)',
+  },
+  distancePillText: {
     fontSize: 11,
+    fontWeight: '700',
+    color: Palette.softLavender,
+  },
+  distancePillTextNear: {
+    color: Palette.successGreen,
+  },
+  resultLabelText: {
+    fontSize: 12,
     color: Palette.secondaryText,
-    marginTop: 2,
+    marginTop: 3,
+    lineHeight: 16,
   },
   exploreCard: {
     backgroundColor: Palette.cardBackground,
