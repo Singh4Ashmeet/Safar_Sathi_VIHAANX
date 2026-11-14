@@ -2,8 +2,7 @@ import { router } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import { Share, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Feather, Ionicons } from '@expo/vector-icons';
-import * as Haptics from 'expo-haptics';
+import { Feather } from '@expo/vector-icons';
 import {
   createTripShareLink,
   endTrip,
@@ -42,12 +41,6 @@ export default function LiveTripScreen() {
   // Live Location stream for real-time map movement
   const [liveLocation, setLiveLocation] = useState<LocationFix | null>(null);
 
-  // Automated Periodic Timed Safety Check-In (every 3 minutes)
-  const CHECKIN_INTERVAL_SEC = 180;
-  const [secondsUntilCheckIn, setSecondsUntilCheckIn] = useState(CHECKIN_INTERVAL_SEC);
-  const [checkInModalVisible, setCheckInModalVisible] = useState(false);
-  const [checkInCountdown, setCheckInCountdown] = useState(30);
-
   // 1. Continuous live GPS stream for real-time movement on map
   useEffect(() => {
     const unsub = watchLiveLocation((fix) => {
@@ -55,51 +48,6 @@ export default function LiveTripScreen() {
     }, 1500);
     return unsub;
   }, []);
-
-  // 2. Automated periodic timed safety check-in countdown
-  useEffect(() => {
-    if (checkInModalVisible) return;
-
-    const timer = setInterval(() => {
-      setSecondsUntilCheckIn((prev) => {
-        if (prev <= 1) {
-          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning).catch(() => undefined);
-          setCheckInModalVisible(true);
-          setCheckInCountdown(30);
-          return CHECKIN_INTERVAL_SEC;
-        }
-        return prev - 1;
-      });
-    }, 1000);
-
-    return () => clearInterval(timer);
-  }, [checkInModalVisible]);
-
-  // 3. Safety Check-In Alert Modal Countdown (30s window to confirm "I AM SAFE")
-  useEffect(() => {
-    if (!checkInModalVisible) return;
-
-    const timer = setInterval(() => {
-      setCheckInCountdown((prev) => {
-        if (prev <= 1) {
-          clearInterval(timer);
-          setCheckInModalVisible(false);
-          // Auto-escalate to SOS if user does not respond within countdown!
-          void handleSos();
-          return 0;
-        }
-        return prev - 1;
-      });
-    }, 1000);
-
-    return () => clearInterval(timer);
-  }, [checkInModalVisible]);
-
-  const handleConfirmSafe = () => {
-    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => undefined);
-    setCheckInModalVisible(false);
-    setSecondsUntilCheckIn(CHECKIN_INTERVAL_SEC);
-  };
 
   const latest = getLatestLocation();
   const activeUserCoord = liveLocation
@@ -194,27 +142,6 @@ export default function LiveTripScreen() {
 
       {/* Bottom Control Panel */}
       <View style={styles.controlPanel}>
-        {/* Automated Timed Safety Check-In Bar */}
-        <View style={styles.checkInRow}>
-          <View style={styles.checkInInfo}>
-            <Feather name="clock" size={15} color={Palette.warningAmber} />
-            <Text style={styles.checkInLabel}>
-              Safety Check-In in{' '}
-              <Text style={styles.checkInTime}>
-                {Math.floor(secondsUntilCheckIn / 60)}:{(secondsUntilCheckIn % 60).toString().padStart(2, '0')}
-              </Text>
-            </Text>
-          </View>
-          <TouchableOpacity
-            style={styles.checkInQuickBtn}
-            onPress={handleConfirmSafe}
-            activeOpacity={0.8}
-          >
-            <Feather name="check" size={14} color="#FFFFFF" />
-            <Text style={styles.checkInQuickText}>I'm Safe</Text>
-          </TouchableOpacity>
-        </View>
-
         <Text style={styles.destTitle} numberOfLines={1}>
           {activeTrip?.destination ?? t('trip.protectedTrip')}
         </Text>
@@ -266,33 +193,6 @@ export default function LiveTripScreen() {
           )}
         </View>
       </View>
-
-      {/* High-Priority Safety Check-In Modal */}
-      {checkInModalVisible && (
-        <View style={styles.modalBackdrop}>
-          <View style={styles.checkInModalCard}>
-            <View style={styles.warningIconCircle}>
-              <Feather name="alert-triangle" size={32} color="#EF4444" />
-            </View>
-            <Text style={styles.checkInModalTitle}>Safety Check-In</Text>
-            <Text style={styles.checkInModalSubtitle}>
-              Periodic safety check-in required. Confirm you are safe or emergency guardians will be alerted with your live location.
-            </Text>
-            <View style={styles.countdownBox}>
-              <Text style={styles.countdownSeconds}>{checkInCountdown}s</Text>
-              <Text style={styles.countdownLabel}>Auto-SOS in</Text>
-            </View>
-            <TouchableOpacity
-              style={styles.confirmSafeBtn}
-              onPress={handleConfirmSafe}
-              activeOpacity={0.85}
-            >
-              <Feather name="check-circle" size={20} color="#FFFFFF" />
-              <Text style={styles.confirmSafeBtnText}>I AM SAFE</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      )}
 
       <BottomNav activeTab="trip" />
     </View>
@@ -354,140 +254,6 @@ const styles = StyleSheet.create({
     borderRadius: 22,
     margin: 16,
     padding: 18,
-  },
-  checkInRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    backgroundColor: 'rgba(232, 155, 21, 0.1)',
-    borderWidth: 1,
-    borderColor: 'rgba(232, 155, 21, 0.3)',
-    borderRadius: 14,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    marginBottom: 12,
-  },
-  checkInInfo: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  checkInLabel: {
-    fontSize: 12,
-    color: Palette.secondaryText,
-    fontWeight: '500',
-  },
-  checkInTime: {
-    fontWeight: '800',
-    color: Palette.warningAmber,
-  },
-  checkInQuickBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    backgroundColor: 'rgba(16, 185, 129, 0.85)',
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: 8,
-  },
-  checkInQuickText: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: '#FFFFFF',
-  },
-  modalBackdrop: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: 'rgba(0, 0, 0, 0.82)',
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: 24,
-    zIndex: 9999,
-  },
-  checkInModalCard: {
-    width: '100%',
-    backgroundColor: '#161B2F',
-    borderWidth: 1.5,
-    borderColor: 'rgba(239, 68, 68, 0.6)',
-    borderRadius: 24,
-    padding: 24,
-    alignItems: 'center',
-    shadowColor: '#EF4444',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.45,
-    shadowRadius: 18,
-    elevation: 12,
-  },
-  warningIconCircle: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
-    backgroundColor: 'rgba(239, 68, 68, 0.15)',
-    borderWidth: 1.5,
-    borderColor: 'rgba(239, 68, 68, 0.4)',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 16,
-  },
-  checkInModalTitle: {
-    fontSize: 22,
-    fontWeight: '800',
-    color: Palette.primaryText,
-    marginBottom: 8,
-    textAlign: 'center',
-  },
-  checkInModalSubtitle: {
-    fontSize: 13,
-    color: Palette.secondaryText,
-    textAlign: 'center',
-    lineHeight: 18,
-    marginBottom: 20,
-  },
-  countdownBox: {
-    alignItems: 'center',
-    backgroundColor: 'rgba(239, 68, 68, 0.1)',
-    borderWidth: 1,
-    borderColor: 'rgba(239, 68, 68, 0.3)',
-    borderRadius: 16,
-    paddingVertical: 12,
-    paddingHorizontal: 28,
-    marginBottom: 20,
-  },
-  countdownSeconds: {
-    fontSize: 36,
-    fontWeight: '900',
-    color: '#EF4444',
-  },
-  countdownLabel: {
-    fontSize: 11,
-    color: Palette.mutedText,
-    fontWeight: '600',
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-  },
-  confirmSafeBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    width: '100%',
-    backgroundColor: Palette.successGreen,
-    borderRadius: 16,
-    paddingVertical: 16,
-    shadowColor: Palette.successGreen,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.4,
-    shadowRadius: 10,
-    elevation: 6,
-  },
-  confirmSafeBtnText: {
-    fontSize: 16,
-    fontWeight: '800',
-    color: '#FFFFFF',
-    letterSpacing: 0.5,
   },
   destTitle: {
     fontSize: 18,

@@ -51,6 +51,8 @@ export const envSchema = z.object({
   GUARDIAN_TILE_URL: z.string().default('https://tile.openstreetmap.org/{z}/{x}/{y}.png'),
   GUARDIAN_MAP_STYLE_URL: z.string().default('https://tiles.openfreemap.org/styles/liberty'),
   WATCHDOG_SIGNAL_LOST_SEC: z.coerce.number().default(180),
+  WATCHDOG_FIRST_CHECK_RESPONSE_SEC: z.coerce.number().int().min(1).default(30),
+  WATCHDOG_SECOND_CHECK_RESPONSE_SEC: z.coerce.number().int().min(1).default(10),
   WATCHDOG_LOST_CONTACT_SEC: z.coerce.number().default(300),
   WATCHDOG_ETA_GRACE_SEC: z.coerce.number().default(600),
   RETENTION_TRIP_POINTS_DAYS: z.coerce.number().default(7),

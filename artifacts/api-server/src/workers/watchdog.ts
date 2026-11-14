@@ -66,13 +66,18 @@ export class WatchdogWorker {
           continue;
         }
 
-        // 2. Lost Contact: if stage is 'user_prompted' and still no response
-        //    -> Write escalations row (trip_id, 'guardians_alerted')
-        //    -> Create SOS and alert guardians with last known fix
-        //    -> Set escalation_stage = 'guardians_alerted'
+        // 2. Missed check-in: show a second check after 30 seconds. If that is
+        //    unanswered for 10 seconds, trigger the existing SOS flow without a
+        //    third warning.
         if (escalationStage === 'user_prompted') {
-          const lostContactThreshold = env.WATCHDOG_LOST_CONTACT_SEC * 1000;
-          // Check if we've waited long enough since the signal_lost stage
+          if (nextCheckAt && (now - nextCheckAt >= 0)) {
+            await this.escalateSecondCheck(client, tripId, userId, now);
+            escalatedCount++;
+            continue;
+          }
+        }
+
+        if (escalationStage === 'second_prompted') {
           if (nextCheckAt && (now - nextCheckAt >= 0)) {
             await this.escalateLostContact(client, tripId, userId, lastSeenAt, now);
             escalatedCount++;
@@ -163,8 +168,8 @@ export class WatchdogWorker {
       [tripId, 'signal_lost', now]
     );
 
-    // Update trip: set escalation_stage and next_check_at for lost contact check
-    const nextCheckAt = now + env.WATCHDOG_LOST_CONTACT_SEC * 1000;
+    // First check-in gets a 30-second response window before the second prompt.
+    const nextCheckAt = now + env.WATCHDOG_FIRST_CHECK_RESPONSE_SEC * 1000;
     await client.query(
       'UPDATE trips SET escalation_stage = $1, next_check_at = $2 WHERE id = $3',
       ['user_prompted', nextCheckAt, tripId]
@@ -172,7 +177,27 @@ export class WatchdogWorker {
 
     // TODO: Send silent push prompt to user: "Are you okay?"
     // This would use the notify service with a minimal payload
-    logger.info({ tripId, userId, nextCheckAt }, '[Watchdog] Signal lost - user prompted, next check scheduled');
+    logger.info({ tripId, userId, nextCheckAt }, '[Watchdog] First safety check sent, second check scheduled if unanswered');
+  }
+
+  /**
+   * Stage 2: final check-in prompt. There is deliberately no additional
+   * warning after this one: the normal SOS path runs at its 10-second deadline.
+   */
+  private async escalateSecondCheck(
+    client: any,
+    tripId: string,
+    userId: string,
+    now: number
+  ): Promise<void> {
+    const nextCheckAt = now + env.WATCHDOG_SECOND_CHECK_RESPONSE_SEC * 1000;
+    await client.query(
+      'UPDATE trips SET escalation_stage = $1, next_check_at = $2 WHERE id = $3',
+      ['second_prompted', nextCheckAt, tripId]
+    );
+
+    // TODO: Send final silent push prompt to user: "Please confirm you are safe."
+    logger.info({ tripId, userId, nextCheckAt }, '[Watchdog] Second safety check sent; SOS will trigger if unanswered');
   }
 
   /**
@@ -202,7 +227,7 @@ export class WatchdogWorker {
 
     // Update trip: set escalation_stage to guardians_alerted
     await client.query(
-      'UPDATE trips SET escalation_stage = $1 WHERE id = $2',
+      'UPDATE trips SET escalation_stage = $1, next_check_at = NULL WHERE id = $2',
       ['guardians_alerted', tripId]
     );
 
@@ -293,13 +318,13 @@ export class WatchdogWorker {
     );
 
     // Update trip: set escalation_stage and next_check_at
-    const nextCheckAt = now + env.WATCHDOG_LOST_CONTACT_SEC * 1000;
+    const nextCheckAt = now + env.WATCHDOG_FIRST_CHECK_RESPONSE_SEC * 1000;
     await client.query(
       'UPDATE trips SET escalation_stage = $1, next_check_at = $2 WHERE id = $3',
       ['user_prompted', nextCheckAt, tripId]
     );
 
-    logger.info({ tripId, userId, nextCheckAt }, '[Watchdog] ETA overdue - user prompted, next check scheduled');
+    logger.info({ tripId, userId, nextCheckAt }, '[Watchdog] ETA overdue - first safety check sent');
   }
 
   /**

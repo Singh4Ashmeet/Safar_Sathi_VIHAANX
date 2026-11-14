@@ -19,13 +19,14 @@ export const trips = pgTable(
     lastLat: doublePrecision('last_lat'),
     lastLng: doublePrecision('last_lng'),
     nextCheckAt: bigint('next_check_at', { mode: 'number' }),
-    escalationStage: varchar('escalation_stage', { length: 32 }), // 'signal_lost' | 'user_prompted' | 'guardians_alerted'
+    // A missed check-in moves through user_prompted -> second_prompted before SOS.
+    escalationStage: varchar('escalation_stage', { length: 32 }), // 'signal_lost' | 'user_prompted' | 'second_prompted' | 'guardians_alerted'
   },
   (table) => [
     index('trips_next_check_at_idx').on(table.nextCheckAt),
     index('trips_user_id_idx').on(table.userId),
     check('trips_status_check', sql`${table.status} IN ('active', 'completed', 'cancelled')`),
-    check('trips_escalation_stage_check', sql`${table.escalationStage} IS NULL OR ${table.escalationStage} IN ('signal_lost', 'user_prompted', 'guardians_alerted')`),
+    check('trips_escalation_stage_check', sql`${table.escalationStage} IS NULL OR ${table.escalationStage} IN ('signal_lost', 'user_prompted', 'second_prompted', 'guardians_alerted')`),
   ]
 );
 
