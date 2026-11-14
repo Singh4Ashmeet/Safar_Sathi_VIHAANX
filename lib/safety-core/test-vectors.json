@@ -1,0 +1,58 @@
+{
+  "version": 1,
+  "note": "Golden test vectors shared between SafarSaathi mobile app and api-server",
+  "vectors": [
+    {
+      "name": "critical_sos_normal",
+      "sosId": "11111111-2222-4333-8444-555555555555",
+      "serverBoxPublicKeyB64": "e06Qm75//kTEZaIgA31gjuNYl9Me+XLwf3SJLLD3PxM=",
+      "serverBoxSecretKeyB64": "ERERERERERERERERERERERERERERERERERERERERERE=",
+      "senderSignPublicKeyB64": "oJql9HpnWYAv+VX43C0qFKXJnSO+l/hkEn/5ODRVpPA=",
+      "senderSignSeedHex": "2222222222222222222222222222222222222222222222222222222222222222",
+      "ephemeralSecretHex": "3333333333333333333333333333333333333333333333333333333333333333",
+      "nonceHex": "444444444444444444444444444444444444444444444444",
+      "destTagHex": "a1b2c3d4e5f60708",
+      "createdAtSec": 1762900000,
+      "epochDay": 20403,
+      "expectedSenderTagHex": "e8061cb61864ae77",
+      "ttl": 10,
+      "priority": 3,
+      "plaintext": {
+        "lat": 28.6139123,
+        "lng": 77.2090123,
+        "accuracyM": 12,
+        "locTs": 1762900000,
+        "msgCode": 1,
+        "battery": 78,
+        "duress": false
+      },
+      "packetB64": "AQMRERERIiJDM4REVVVVVVVVobLD1OX2BwhpE7gg6AYcthhkrnd7DUfZNCf4MRFgeBx8cz/Yn4iXCu9JDYqg7hmky4obFERERERERERERERERERERERERERERERERByQgMvEYQ7vxrBeALcZMdXrbrjmflA3bnvAuMb3xb/yUSTrRd3VXKUDF5VP6iOCHYCRGZ1gUqNVQxZsLuo/S/RNd9d8MlZ52s9YnBsP5m9W5GnXEdesI0+ozUwCdbNB8QgK"
+    },
+    {
+      "name": "critical_sos_duress",
+      "sosId": "aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee",
+      "serverBoxPublicKeyB64": "e06Qm75//kTEZaIgA31gjuNYl9Me+XLwf3SJLLD3PxM=",
+      "serverBoxSecretKeyB64": "ERERERERERERERERERERERERERERERERERERERERERE=",
+      "senderSignPublicKeyB64": "oJql9HpnWYAv+VX43C0qFKXJnSO+l/hkEn/5ODRVpPA=",
+      "senderSignSeedHex": "2222222222222222222222222222222222222222222222222222222222222222",
+      "ephemeralSecretHex": "6666666666666666666666666666666666666666666666666666666666666666",
+      "nonceHex": "555555555555555555555555555555555555555555555555",
+      "destTagHex": "a1b2c3d4e5f60708",
+      "createdAtSec": 1762900060,
+      "epochDay": 20403,
+      "expectedSenderTagHex": "e8061cb61864ae77",
+      "ttl": 8,
+      "priority": 3,
+      "plaintext": {
+        "lat": 19.0760123,
+        "lng": 72.8777123,
+        "accuracyM": 25,
+        "locTs": 1762900060,
+        "msgCode": 2,
+        "battery": 19,
+        "duress": true
+      },
+      "packetB64": "AQOqqqqqu7tMzI3d7u7u7u7uobLD1OX2BwhpE7hc6AYcthhkrnchnk2ADalo0qX8sAnHhPR0bHE47bnuSES3OegwsFz0JFVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVc+n+9Hc8vVnf+R/dUcxzdw8daGeA6m6QXaxk9go4YG7de5gb6izWFFqXohv2Iu7yXSS5wAzLAQO1o577SJwmCijTq3DyDHr4KmsbGGj9RJpxAZG5PNFdqLJ+u+V1Jxm7w8I"
+    }
+  ]
+}

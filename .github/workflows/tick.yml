@@ -1,0 +1,25 @@
+name: SafarSaathi Watchdog Backup Ticker
+
+on:
+  schedule:
+    # Triggered every 5 minutes (backup ticker for watchdog escalations and keep-warm)
+    - cron: '*/5 * * * *'
+  workflow_dispatch:
+
+jobs:
+  tick:
+    name: Ping Watchdog /internal/tick
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+
+    steps:
+      - name: Trigger Internal Tick
+        run: |
+          echo "Dispatching backup tick to SafarSaathi watchdog..."
+          curl -f -s -S -X POST "${{ secrets.API_BASE_URL }}/internal/tick" \
+            -H "Content-Type: application/json" \
+            -H "X-Tick-Secret: ${{ secrets.TICK_SECRET }}" \
+            -d '{"source": "github"}' \
+            --retry 2 \
+            --max-time 30
+

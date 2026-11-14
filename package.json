@@ -1,0 +1,26 @@
+{
+  "name": "safarsaathi-monorepo",
+  "version": "2.0.0",
+  "private": true,
+  "packageManager": "pnpm@10.33.0",
+  "scripts": {
+    "build": "pnpm --filter @workspace/db build && pnpm --filter api-server build",
+    "typecheck:libs": "pnpm --filter @workspace/db build && tsc --build tsconfig.json",
+    "typecheck": "pnpm run typecheck:libs && pnpm -r --if-present typecheck",
+    "test": "pnpm -r --if-present test",
+    "db:generate": "pnpm --filter @workspace/db db:generate",
+    "db:migrate": "pnpm --filter @workspace/db db:migrate",
+    "db:seed": "pnpm --filter @workspace/db db:seed",
+    "gen:api": "pnpm --filter @workspace/api-spec codegen",
+    "mock:api": "pnpm --filter @workspace/api-spec mock"
+  },
+  "devDependencies": {
+    "typescript": "~5.9.2"
+  },
+  "pnpm": {
+    "overrides": {
+      "react": "19.3.0",
+      "react-dom": "19.3.0"
+    }
+  }
+}

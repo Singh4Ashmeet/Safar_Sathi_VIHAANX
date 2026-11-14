@@ -1,0 +1,16 @@
+# SafarSaathi 2.0 Ownership Map (Section 15.2)
+# Replace @DevA / @DevB / @DevC handles with GitHub usernames when team handles are finalized.
+
+/artifacts/api-server/**                    @Singh4Ashmeet
+/lib/db/**                                  @Singh4Ashmeet
+/artifacts/safarsaathi/app/**               @DevB
+/artifacts/safarsaathi/components/**        @DevB
+/artifacts/safarsaathi/i18n/**              @DevB
+/artifacts/safarsaathi/constants/**         @DevB
+/artifacts/safarsaathi/services/**          @ADITYAMITTAL
+/lib/safety-core/**                         @ADITYAMITTAL
+/lib/api-spec/openapi.yaml                  @ADITYAMITTAL @Singh4Ashmeet @DevB
+/lib/api-client-react/src/generated/**      @ADITYAMITTAL
+/lib/api-zod/src/generated/**               @ADITYAMITTAL
+/.github/**                                 @ADITYAMITTAL
+

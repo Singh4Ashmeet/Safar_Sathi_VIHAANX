@@ -1,0 +1,2 @@
+ALTER TABLE "tick_log" DROP CONSTRAINT "tick_log_source_check";--> statement-breakpoint
+ALTER TABLE "tick_log" ADD CONSTRAINT "tick_log_source_check" CHECK ("tick_log"."source" IN ('cron', 'github', 'in_process', 'boot_catch_up'));

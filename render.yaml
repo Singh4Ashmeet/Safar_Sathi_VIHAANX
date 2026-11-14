@@ -1,0 +1,75 @@
+# Render Blueprint Specification (TRD Section 7.4, 8.4)
+# Deploy SafarSaathi 2.0 Backend on Render Free Tier
+# Single source of truth for Render Web Service configuration.
+
+services:
+  - type: web
+    name: safarsaathi-api
+    runtime: node
+    plan: free
+    region: singapore
+    buildCommand: pnpm install --frozen-lockfile && pnpm build
+    startCommand: node artifacts/api-server/dist/index.js
+    healthCheckPath: /api/healthz
+    autoDeploy: true
+    envVars:
+      - key: NODE_ENV
+        value: production
+
+      - key: PORT
+        value: 10000
+
+      # Database: Supabase IPv4 Pooled Connection String (Plain Postgres via Drizzle)
+      # e.g. postgres://postgres.[ref]:[password]@aws-0-[region].pooler.supabase.com:6543/postgres?pgbouncer=true
+      - key: DATABASE_URL
+        sync: false
+
+      # Identity: Firebase Spark Plan Service Account JSON (Mandatory in production)
+      - key: FIREBASE_SERVICE_ACCOUNT_JSON
+        sync: false
+
+      # Security: Dev auth bypass is strictly prohibited in production
+      - key: DEV_AUTH_BYPASS
+        value: "false"
+
+      # Watchdog Secret: High-entropy secret for /internal/tick authorization
+      - key: TICK_SECRET
+        generateValue: true
+
+      # Public Base URL for tracking links (Render service public URL)
+      - key: PUBLIC_BASE_URL
+        sync: false
+
+      - key: ALLOWED_ORIGINS
+        value: "*"
+
+      # Alert channels & integrations
+      - key: SMS_PROVIDER
+        value: console
+
+      - key: GUARDIAN_TILE_URL
+        value: https://tile.openstreetmap.org/{z}/{x}/{y}.png
+
+      # Watchdog parameters (TRD 8.4)
+      - key: WATCHDOG_SIGNAL_LOST_SEC
+        value: "180"
+
+      - key: WATCHDOG_LOST_CONTACT_SEC
+        value: "300"
+
+      - key: WATCHDOG_ETA_GRACE_SEC
+        value: "600"
+
+      - key: RETENTION_TRIP_POINTS_DAYS
+        value: "7"
+
+      - key: ROUTING_DAILY_LIMIT
+        value: "1800"
+
+      # Cryptographic Relay Box Keys (Optional in initial deploy, required for offline BLE relay)
+      - key: SERVER_BOX_SECRET_KEY
+        sync: false
+
+      - key: SERVER_BOX_PUBLIC_KEY
+        sync: false
+

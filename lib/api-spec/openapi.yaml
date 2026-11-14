@@ -1,0 +1,1286 @@
+openapi: 3.1.0
+info:
+  # Do not change the title, if the title changes, the import paths will be broken
+  title: Api
+  version: 2.0.0
+  description: SafarSaathi 2.0 (Free-Stack Edition) frozen v1 API contract
+servers:
+  - url: /api
+    description: Base API path
+tags:
+  - name: health
+  - name: me
+  - name: guardians
+  - name: routing
+  - name: trips
+  - name: sos
+  - name: watch
+  - name: relay
+  - name: safety
+  - name: rides
+security:
+  - bearerAuth: []
+paths:
+  /healthz:
+    get:
+      operationId: healthCheck
+      tags: [health]
+      security: []
+      summary: Liveness check
+      responses:
+        "200":
+          description: Healthy
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthStatus"
+
+  /readyz:
+    get:
+      operationId: readyCheck
+      tags: [health]
+      security: []
+      summary: Readiness check (DB + last watchdog tick age)
+      responses:
+        "200":
+          description: Ready
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ReadyStatus"
+        "503":
+          description: Degraded
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ReadyStatus"
+
+  /v1/me:
+    get:
+      operationId: getMe
+      tags: [me]
+      summary: Read profile and settings
+      responses:
+        "200":
+          description: User profile
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserProfile"
+        "401":
+          $ref: "#/components/responses/ErrorResponse"
+    put:
+      operationId: upsertMe
+      tags: [me]
+      summary: Upsert profile, push token, public keys, and language
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpsertMeRequest"
+      responses:
+        "200":
+          description: Updated profile
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserProfile"
+        "400":
+          $ref: "#/components/responses/ErrorResponse"
+        "401":
+          $ref: "#/components/responses/ErrorResponse"
+    delete:
+      operationId: deleteMe
+      tags: [me]
+      summary: Delete account and all personal data (DPDP right to erasure)
+      responses:
+        "200":
+          description: Deleted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OkResponse"
+        "401":
+          $ref: "#/components/responses/ErrorResponse"
+
+  /v1/me/relay-bundle:
+    get:
+      operationId: getRelayBundle
+      tags: [me, relay]
+      summary: Server public key, epoch tags, and TTL policy for offline BLE relay
+      responses:
+        "200":
+          description: Relay bundle
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RelayBundle"
+        "401":
+          $ref: "#/components/responses/ErrorResponse"
+
+  /v1/guardians:
+    get:
+      operationId: listGuardians
+      tags: [guardians]
+      summary: List guardians with consent status and channels
+      responses:
+        "200":
+          description: Guardians list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Guardian"
+        "401":
+          $ref: "#/components/responses/ErrorResponse"
+    post:
+      operationId: addGuardian
+      tags: [guardians]
+      summary: Add guardian (2-5 per user) and trigger consent flow
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AddGuardianRequest"
+      responses:
+        "201":
+          description: Guardian created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AddGuardianResult"
+        "400":
+          $ref: "#/components/responses/ErrorResponse"
+        "401":
+          $ref: "#/components/responses/ErrorResponse"
+
+  /v1/guardians/{id}:
+    delete:
+      operationId: removeGuardian
+      tags: [guardians]
+      summary: Remove guardian and revoke all share links
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Removed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OkResponse"
+        "401":
+          $ref: "#/components/responses/ErrorResponse"
+        "404":
+          $ref: "#/components/responses/ErrorResponse"
+
+  /v1/routes:
+    post:
+      operationId: computeRoute
+      tags: [routing]
+      summary: Compute route and ETA via OpenRouteService proxy with cache and straight-line fallback
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RouteRequest"
+      responses:
+        "200":
+          description: Route result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RouteResponse"
+        "400":
+          $ref: "#/components/responses/ErrorResponse"
+        "401":
+          $ref: "#/components/responses/ErrorResponse"
+
+  /v1/places/search:
+    get:
+      operationId: searchPlaces
+      tags: [routing]
+      summary: Debounced place search via geocoding proxy
+      parameters:
+        - name: q
+          in: query
+          required: true
+          schema:
+            type: string
+            minLength: 2
+        - name: lat
+          in: query
+          required: false
+          schema:
+            type: number
+        - name: lng
+          in: query
+          required: false
+          schema:
+            type: number
+      responses:
+        "200":
+          description: Matching places
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/PlaceResult"
+        "400":
+          $ref: "#/components/responses/ErrorResponse"
+        "401":
+          $ref: "#/components/responses/ErrorResponse"
+
+  /v1/trips:
+    post:
+      operationId: createTrip
+      tags: [trips]
+      summary: Create trip (client-generated UUIDv4)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateTripRequest"
+      responses:
+        "201":
+          description: Trip created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Trip"
+        "400":
+          $ref: "#/components/responses/ErrorResponse"
+        "401":
+          $ref: "#/components/responses/ErrorResponse"
+
+  /v1/trips/{id}/locations:
+    post:
+      operationId: ingestTripLocations
+      tags: [trips]
+      summary: Batch location ingest (up to 50 points, idempotent by ts)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LocationBatchRequest"
+      responses:
+        "200":
+          description: Accepted count and lastSeenAt
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LocationBatchResponse"
+        "400":
+          $ref: "#/components/responses/ErrorResponse"
+        "401":
+          $ref: "#/components/responses/ErrorResponse"
+        "404":
+          $ref: "#/components/responses/ErrorResponse"
+
+  /v1/trips/{id}/end:
+    post:
+      operationId: endTrip
+      tags: [trips]
+      summary: End trip safely
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Trip ended
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Trip"
+        "401":
+          $ref: "#/components/responses/ErrorResponse"
+        "404":
+          $ref: "#/components/responses/ErrorResponse"
+
+  /v1/trips/{id}/share:
+    post:
+      operationId: createTripShareLink
+      tags: [trips]
+      summary: Create expiring guardian share link
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateShareLinkRequest"
+      responses:
+        "201":
+          description: Share link created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ShareLinkResponse"
+        "401":
+          $ref: "#/components/responses/ErrorResponse"
+        "404":
+          $ref: "#/components/responses/ErrorResponse"
+    delete:
+      operationId: revokeTripShareLinks
+      tags: [trips]
+      summary: Revoke share links for trip
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Revoked
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OkResponse"
+        "401":
+          $ref: "#/components/responses/ErrorResponse"
+
+  /v1/sos:
+    post:
+      operationId: createSos
+      tags: [sos]
+      summary: Create SOS (client-generated UUIDv4, idempotent)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateSosRequest"
+      responses:
+        "201":
+          description: SOS active
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CreateSosResult"
+        "400":
+          $ref: "#/components/responses/ErrorResponse"
+        "401":
+          $ref: "#/components/responses/ErrorResponse"
+
+  /v1/sos/{id}/locations:
+    post:
+      operationId: ingestSosLocations
+      tags: [sos]
+      summary: Live location updates during active SOS
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LocationBatchRequest"
+      responses:
+        "200":
+          description: Accepted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LocationBatchResponse"
+        "401":
+          $ref: "#/components/responses/ErrorResponse"
+
+  /v1/sos/{id}/cancel:
+    post:
+      operationId: cancelSos
+      tags: [sos]
+      summary: Cancel with pinKind (cancel stops; duress keeps alerting silently)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CancelSosRequest"
+      responses:
+        "200":
+          description: Cancel response (visually identical for duress)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CancelSosResult"
+        "401":
+          $ref: "#/components/responses/ErrorResponse"
+        "404":
+          $ref: "#/components/responses/ErrorResponse"
+
+  /v1/sos/{id}/ack:
+    post:
+      operationId: acknowledgeSos
+      tags: [sos]
+      security: []
+      summary: Guardian acknowledge SOS (public token or authenticated user)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AckSosRequest"
+      responses:
+        "200":
+          description: Acknowledged
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OkResponse"
+        "400":
+          $ref: "#/components/responses/ErrorResponse"
+
+  /v1/sos/{id}:
+    get:
+      operationId: getSosStatus
+      tags: [sos]
+      summary: Get SOS status with per-guardian, per-channel deliveries
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: SOS status
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SosStatusResponse"
+        "401":
+          $ref: "#/components/responses/ErrorResponse"
+        "404":
+          $ref: "#/components/responses/ErrorResponse"
+
+  /v1/watch:
+    post:
+      operationId: startWatchMe
+      tags: [watch]
+      summary: Start server-owned Watch Me timer (15/30/45/60 min)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/StartWatchRequest"
+      responses:
+        "201":
+          description: Watch timer started
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WatchTimer"
+        "400":
+          $ref: "#/components/responses/ErrorResponse"
+        "401":
+          $ref: "#/components/responses/ErrorResponse"
+
+  /v1/watch/{id}/confirm:
+    post:
+      operationId: confirmWatchMe
+      tags: [watch]
+      summary: Confirm safe before Watch Me expires
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Confirmed safe
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WatchTimer"
+        "401":
+          $ref: "#/components/responses/ErrorResponse"
+        "404":
+          $ref: "#/components/responses/ErrorResponse"
+
+  /v1/relay/packets:
+    post:
+      operationId: uploadRelayPackets
+      tags: [relay]
+      security: []
+      summary: Gateway upload of encrypted BLE relay packets (idempotent by eventId)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RelayPacketsUploadRequest"
+      responses:
+        "200":
+          description: Per-packet ingest results
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RelayPacketsUploadResponse"
+        "400":
+          $ref: "#/components/responses/ErrorResponse"
+
+  /v1/safety/zones:
+    get:
+      operationId: listSafetyZones
+      tags: [safety]
+      summary: Get risk and safe zones near coordinates
+      parameters:
+        - name: lat
+          in: query
+          required: true
+          schema:
+            type: number
+        - name: lng
+          in: query
+          required: true
+          schema:
+            type: number
+        - name: radius
+          in: query
+          required: false
+          schema:
+            type: number
+            default: 5000
+        - name: timeOfDay
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [day, night]
+      responses:
+        "200":
+          description: Nearby safety zones
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/SafetyZone"
+        "401":
+          $ref: "#/components/responses/ErrorResponse"
+
+  /v1/safety/reports:
+    post:
+      operationId: submitSafetyReport
+      tags: [safety]
+      summary: Submit crowd-sourced safety report (rate-limited)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SafetyReportRequest"
+      responses:
+        "201":
+          description: Report recorded
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SafetyReportResponse"
+        "400":
+          $ref: "#/components/responses/ErrorResponse"
+        "401":
+          $ref: "#/components/responses/ErrorResponse"
+        "429":
+          $ref: "#/components/responses/ErrorResponse"
+
+  /v1/rides:
+    post:
+      operationId: registerRide
+      tags: [rides]
+      summary: Register ride details (plate, driver) and share with guardians
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RegisterRideRequest"
+      responses:
+        "201":
+          description: Ride registered
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Ride"
+        "400":
+          $ref: "#/components/responses/ErrorResponse"
+        "401":
+          $ref: "#/components/responses/ErrorResponse"
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  responses:
+    ErrorResponse:
+      description: Standard error envelope
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorEnvelope"
+
+  schemas:
+    ErrorEnvelope:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: object
+          required: [code, message]
+          properties:
+            code:
+              type: string
+            message:
+              type: string
+            details:
+              type: object
+              additionalProperties: true
+
+    OkResponse:
+      type: object
+      required: [ok]
+      properties:
+        ok:
+          type: boolean
+
+    HealthStatus:
+      type: object
+      required: [status]
+      properties:
+        status:
+          type: string
+        service:
+          type: string
+        uptimeSec:
+          type: integer
+        timestamp:
+          type: integer
+          format: int64
+
+    ReadyStatus:
+      type: object
+      required: [status, database, timestamp]
+      properties:
+        status:
+          type: string
+          enum: [ready, degraded]
+        database:
+          type: string
+          enum: [connected, disconnected]
+        watchdogTick:
+          type: string
+          enum: [ok, degraded]
+        lastTickAgeSec:
+          type: [integer, "null"]
+        timestamp:
+          type: integer
+          format: int64
+
+    Coord:
+      type: object
+      required: [lat, lng, ts]
+      properties:
+        lat:
+          type: number
+          minimum: -90
+          maximum: 90
+        lng:
+          type: number
+          minimum: -180
+          maximum: 180
+        acc:
+          type: number
+          minimum: 0
+        ts:
+          type: integer
+          format: int64
+        mocked:
+          type: boolean
+
+    Channel:
+      type: string
+      enum: [push, sms, telegram, email]
+
+    DeliveryStatus:
+      type: string
+      enum: [queued, sent, failed, acknowledged]
+
+    UserProfile:
+      type: object
+      required: [id, name, phone, lang, boxPub, signPub, createdAt]
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        phone:
+          type: string
+        lang:
+          type: string
+          enum: [en, hi]
+        boxPub:
+          type: string
+        signPub:
+          type: string
+        expoPushToken:
+          type: [string, "null"]
+        adultConfirmedAt:
+          type: [integer, "null"]
+          format: int64
+        createdAt:
+          type: integer
+          format: int64
+
+    UpsertMeRequest:
+      type: object
+      required: [name, phone, lang, boxPub, signPub]
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 120
+        phone:
+          type: string
+        lang:
+          type: string
+          enum: [en, hi]
+        boxPub:
+          type: string
+        signPub:
+          type: string
+        expoPushToken:
+          type: string
+        adultConfirmedAt:
+          type: integer
+          format: int64
+
+    Guardian:
+      type: object
+      required: [id, name, phoneE164, relationship, channels, consentStatus, createdAt]
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        phoneE164:
+          type: string
+        email:
+          type: [string, "null"]
+        relationship:
+          type: string
+        channels:
+          type: array
+          items:
+            type: string
+            enum: [sms, telegram, email]
+        consentStatus:
+          type: string
+          enum: [pending, granted, revoked]
+        createdAt:
+          type: integer
+          format: int64
+
+    AddGuardianRequest:
+      type: object
+      required: [name, phoneE164, relationship, channels]
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 120
+        phoneE164:
+          type: string
+        email:
+          type: string
+          format: email
+        relationship:
+          type: string
+          minLength: 1
+          maxLength: 64
+        channels:
+          type: array
+          minItems: 1
+          items:
+            type: string
+            enum: [sms, telegram, email]
+
+    AddGuardianResult:
+      type: object
+      required: [guardian, telegramDeepLink]
+      properties:
+        guardian:
+          $ref: "#/components/schemas/Guardian"
+        telegramDeepLink:
+          type: [string, "null"]
+
+    RouteRequest:
+      type: object
+      required: [origin, destination]
+      properties:
+        origin:
+          $ref: "#/components/schemas/Coord"
+        destination:
+          $ref: "#/components/schemas/Coord"
+
+    RouteResponse:
+      type: object
+      required: [polyline, durationSec, distanceM, source]
+      properties:
+        polyline:
+          type: string
+        durationSec:
+          type: integer
+        distanceM:
+          type: number
+        source:
+          type: string
+          enum: [ors, cache, straight_line]
+
+    PlaceResult:
+      type: object
+      required: [id, label, lat, lng]
+      properties:
+        id:
+          type: string
+        label:
+          type: string
+        lat:
+          type: number
+        lng:
+          type: number
+
+    CreateTripRequest:
+      type: object
+      required: [tripId, destination, destLat, destLng, routePolyline, startedAt]
+      properties:
+        tripId:
+          type: string
+          format: uuid
+        destination:
+          type: string
+        destLat:
+          type: number
+        destLng:
+          type: number
+        routePolyline:
+          type: string
+        startedAt:
+          type: integer
+          format: int64
+        etaAt:
+          type: integer
+          format: int64
+
+    Trip:
+      type: object
+      required: [id, destination, destLat, destLng, routePolyline, status, startedAt]
+      properties:
+        id:
+          type: string
+          format: uuid
+        destination:
+          type: string
+        destLat:
+          type: number
+        destLng:
+          type: number
+        routePolyline:
+          type: string
+        status:
+          type: string
+          enum: [active, completed, cancelled]
+        startedAt:
+          type: integer
+          format: int64
+        etaAt:
+          type: [integer, "null"]
+          format: int64
+        endedAt:
+          type: [integer, "null"]
+          format: int64
+        lastSeenAt:
+          type: [integer, "null"]
+          format: int64
+        escalationStage:
+          type: [string, "null"]
+          enum: [signal_lost, user_prompted, guardians_alerted, null]
+
+    LocationBatchRequest:
+      type: object
+      required: [points]
+      properties:
+        points:
+          type: array
+          minItems: 1
+          maxItems: 50
+          items:
+            $ref: "#/components/schemas/Coord"
+
+    LocationBatchResponse:
+      type: object
+      required: [accepted, lastSeenAt]
+      properties:
+        accepted:
+          type: integer
+        lastSeenAt:
+          type: integer
+          format: int64
+
+    CreateShareLinkRequest:
+      type: object
+      properties:
+        guardianId:
+          type: string
+          format: uuid
+        expiresInSec:
+          type: integer
+          minimum: 300
+          maximum: 86400
+
+    ShareLinkResponse:
+      type: object
+      required: [url, expiresAt]
+      properties:
+        url:
+          type: string
+        expiresAt:
+          type: integer
+          format: int64
+
+    CreateSosRequest:
+      type: object
+      required: [sosId, trigger, duress, createdAt]
+      properties:
+        sosId:
+          type: string
+          format: uuid
+        tripId:
+          type: string
+          format: uuid
+        trigger:
+          type: string
+          enum: [button, shake, prompt_timeout, watchdog, ble_relay]
+        duress:
+          type: boolean
+        location:
+          $ref: "#/components/schemas/Coord"
+        battery:
+          type: integer
+          minimum: 0
+          maximum: 100
+        createdAt:
+          type: integer
+          format: int64
+
+    GuardianDeliveryItem:
+      type: object
+      required: [guardianId, channel, status]
+      properties:
+        guardianId:
+          type: string
+        guardianName:
+          type: string
+        channel:
+          $ref: "#/components/schemas/Channel"
+        status:
+          $ref: "#/components/schemas/DeliveryStatus"
+        updatedAt:
+          type: integer
+          format: int64
+
+    CreateSosResult:
+      type: object
+      required: [sosId, status, guardians]
+      properties:
+        sosId:
+          type: string
+          format: uuid
+        status:
+          type: string
+          enum: [active, acknowledged, resolved, cancelled]
+        guardians:
+          type: array
+          items:
+            $ref: "#/components/schemas/GuardianDeliveryItem"
+
+    CancelSosRequest:
+      type: object
+      required: [pinKind]
+      properties:
+        pinKind:
+          type: string
+          enum: [cancel, duress]
+
+    CancelSosResult:
+      type: object
+      required: [sosId, status]
+      properties:
+        sosId:
+          type: string
+          format: uuid
+        status:
+          type: string
+          enum: [cancelled]
+
+    AckSosRequest:
+      type: object
+      properties:
+        guardianId:
+          type: string
+          format: uuid
+        token:
+          type: string
+
+    SosStatusResponse:
+      type: object
+      required: [sosId, status, source, createdAt, deliveries]
+      properties:
+        sosId:
+          type: string
+          format: uuid
+        status:
+          type: string
+          enum: [active, acknowledged, resolved, cancelled]
+        source:
+          type: string
+          enum: [direct, ble_gateway]
+        createdAt:
+          type: integer
+          format: int64
+        deliveries:
+          type: array
+          items:
+            $ref: "#/components/schemas/GuardianDeliveryItem"
+
+    StartWatchRequest:
+      type: object
+      required: [minutes]
+      properties:
+        minutes:
+          type: integer
+          enum: [15, 30, 45, 60]
+
+    WatchTimer:
+      type: object
+      required: [id, endsAt, status, createdAt]
+      properties:
+        id:
+          type: string
+          format: uuid
+        endsAt:
+          type: integer
+          format: int64
+        status:
+          type: string
+          enum: [active, confirmed, expired]
+        createdAt:
+          type: integer
+          format: int64
+
+    RelayBundle:
+      type: object
+      required: [serverBoxPublicKey, epoch, destTagForGateway, ttlStart, maxAgeSec, minAppVersion]
+      properties:
+        serverBoxPublicKey:
+          type: string
+        epoch:
+          type: integer
+        destTagForGateway:
+          type: string
+        ttlStart:
+          type: integer
+        maxAgeSec:
+          type: integer
+        minAppVersion:
+          type: string
+
+    RelayPacketUploadItem:
+      type: object
+      required: [b64, receivedAt, hops]
+      properties:
+        b64:
+          type: string
+        receivedAt:
+          type: integer
+          format: int64
+        hops:
+          type: integer
+          minimum: 0
+          maximum: 20
+
+    RelayPacketsUploadRequest:
+      type: object
+      required: [packets]
+      properties:
+        packets:
+          type: array
+          minItems: 1
+          maxItems: 50
+          items:
+            $ref: "#/components/schemas/RelayPacketUploadItem"
+
+    RelayPacketUploadResult:
+      type: object
+      required: [eventId, status]
+      properties:
+        eventId:
+          type: string
+        status:
+          type: string
+          enum: [accepted, duplicate, invalid, expired]
+
+    RelayPacketsUploadResponse:
+      type: object
+      required: [results]
+      properties:
+        results:
+          type: array
+          items:
+            $ref: "#/components/schemas/RelayPacketUploadResult"
+
+    SafetyZone:
+      type: object
+      required: [id, lat, lng, radiusM, category, severity, source, updatedAt]
+      properties:
+        id:
+          type: string
+          format: uuid
+        lat:
+          type: number
+        lng:
+          type: number
+        radiusM:
+          type: number
+        category:
+          type: string
+        severity:
+          type: string
+          enum: [low, medium, high]
+        source:
+          type: string
+          enum: [seed, reports]
+        updatedAt:
+          type: integer
+          format: int64
+
+    SafetyReportRequest:
+      type: object
+      required: [lat, lng, category]
+      properties:
+        lat:
+          type: number
+          minimum: -90
+          maximum: 90
+        lng:
+          type: number
+          minimum: -180
+          maximum: 180
+        category:
+          type: string
+          enum: [poor_lighting, harassment, isolation, theft_snatch, safe_patrol]
+        note:
+          type: string
+          maxLength: 280
+
+    SafetyReportResponse:
+      type: object
+      required: [id, status, createdAt]
+      properties:
+        id:
+          type: string
+          format: uuid
+        status:
+          type: string
+        createdAt:
+          type: integer
+          format: int64
+
+    RegisterRideRequest:
+      type: object
+      required: [plate]
+      properties:
+        plate:
+          type: string
+          minLength: 2
+          maxLength: 32
+        driverName:
+          type: string
+          maxLength: 120
+        tripId:
+          type: string
+          format: uuid
+
+    Ride:
+      type: object
+      required: [id, plate, startedAt, status]
+      properties:
+        id:
+          type: string
+          format: uuid
+        plate:
+          type: string
+        driverName:
+          type: [string, "null"]
+        startedAt:
+          type: integer
+          format: int64
+        status:
+          type: string
+          enum: [active, completed]
