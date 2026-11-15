@@ -91,7 +91,7 @@ export default function PrivacyScreen() {
           <Text style={styles.subLabel}>{t('privacy.consentedGuardians')} ({consented.length})</Text>
           {consented.length === 0 ? (
             <Text style={styles.mutedText}>
-              Guardian Mom and Aanya receive emergency SOS alerts only. Live route tracking requires trip initiation.
+              No guardians have been added yet. Add trusted contacts in the Guardians screen to receive live tracking links and SOS alerts.
             </Text>
           ) : (
             consented.map((g) => (

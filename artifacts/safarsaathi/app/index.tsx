@@ -16,6 +16,7 @@ import OfflineBanner from '@/components/OfflineBanner';
 import SOSButton from '@/components/SOSButton';
 import Colors, { Palette } from '@/constants/colors';
 import { useTripContext } from '@/context/TripContext';
+import { useGuardians } from '@/context/GuardianContext';
 import { t, useLanguage } from '@/i18n';
 import { useShakeSosTrigger } from '@/services/sos';
 
@@ -23,6 +24,7 @@ export default function HomeScreen() {
   useLanguage();
   const insets = useSafeAreaInsets();
   const { activeTrip, discreetMode, setDiscreetMode, triggerSosFlow } = useTripContext();
+  const { guardians } = useGuardians();
 
   const handleSos = useCallback(
     async (trigger: 'button' | 'shake') => {
@@ -156,15 +158,27 @@ export default function HomeScreen() {
             </TouchableOpacity>
           </View>
 
-          <View style={styles.guardianAvatarsRow}>
-            <View style={styles.avatarBubble}>
-              <Text style={styles.avatarLetter}>M</Text>
+          {guardians.length > 0 ? (
+            <View style={styles.guardianAvatarsRow}>
+              {guardians.slice(0, 3).map((g, idx) => (
+                <View key={g.id} style={[styles.avatarBubble, idx > 0 && { marginLeft: -8 }]}>
+                  <Text style={styles.avatarLetter}>{g.name.charAt(0).toUpperCase()}</Text>
+                </View>
+              ))}
+              <Text style={styles.guardianCountText}>
+                {guardians.length === 1 ? '1 guardian added' : `${guardians.length} guardians added`}
+              </Text>
             </View>
-            <View style={[styles.avatarBubble, { marginLeft: -8 }]}>
-              <Text style={styles.avatarLetter}>A</Text>
-            </View>
-            <Text style={styles.guardianCountText}>{t('home.guardiansAdded')}</Text>
-          </View>
+          ) : (
+            <TouchableOpacity
+              style={styles.guardianEmptyRow}
+              onPress={() => router.push('/guardians')}
+              activeOpacity={0.8}
+            >
+              <Feather name="user-plus" size={16} color={Palette.primaryViolet} />
+              <Text style={styles.guardianEmptyText}>No guardians added. Tap to add trusted contacts.</Text>
+            </TouchableOpacity>
+          )}
         </View>
 
         {/* Discreet Mode Toggle Card */}
@@ -380,6 +394,17 @@ const styles = StyleSheet.create({
     fontWeight: '500',
     color: Palette.secondaryText,
     marginLeft: 12,
+  },
+  guardianEmptyRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingVertical: 6,
+  },
+  guardianEmptyText: {
+    fontSize: 13,
+    color: Palette.secondaryText,
+    fontWeight: '500',
   },
   discreetCard: {
     flexDirection: 'row',

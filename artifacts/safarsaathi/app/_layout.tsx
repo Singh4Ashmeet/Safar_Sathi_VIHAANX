@@ -16,6 +16,7 @@ import { StatusBar } from 'expo-status-bar';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 import OpeningScreen from '@/components/OpeningScreen';
 import { AuthProvider, useAuth } from '@/context/AuthContext';
+import { GuardianProvider } from '@/context/GuardianContext';
 import { TripProvider } from '@/context/TripContext';
 import { loadLanguage } from '@/i18n';
 
@@ -100,19 +101,21 @@ export default function RootLayout() {
       <ErrorBoundary>
         <QueryClientProvider client={queryClient}>
           <AuthProvider>
-            <TripProvider>
-              <GestureHandlerRootView style={{ flex: 1 }}>
-                <KeyboardProvider>
-                  {!hasShownOpening ? (
-                    <OpeningScreen onFinish={() => setHasShownOpening(true)} />
-                  ) : (
-                    <AuthGate>
-                      <RootLayoutNav />
-                    </AuthGate>
-                  )}
-                </KeyboardProvider>
-              </GestureHandlerRootView>
-            </TripProvider>
+            <GuardianProvider>
+              <TripProvider>
+                <GestureHandlerRootView style={{ flex: 1 }}>
+                  <KeyboardProvider>
+                    {!hasShownOpening ? (
+                      <OpeningScreen onFinish={() => setHasShownOpening(true)} />
+                    ) : (
+                      <AuthGate>
+                        <RootLayoutNav />
+                      </AuthGate>
+                    )}
+                  </KeyboardProvider>
+                </GestureHandlerRootView>
+              </TripProvider>
+            </GuardianProvider>
           </AuthProvider>
         </QueryClientProvider>
       </ErrorBoundary>

@@ -3,7 +3,6 @@ import React from 'react';
 import { Linking, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
-import { useListGuardians } from '@workspace/api-client-react';
 import BottomNav from '@/components/BottomNav';
 import BrandHeader from '@/components/BrandHeader';
 import DeliveryRow from '@/components/DeliveryRow';
@@ -11,6 +10,7 @@ import OfflineBanner from '@/components/OfflineBanner';
 import SafetyMapView from '@/components/SafetyMapView';
 import Colors, { Palette } from '@/constants/colors';
 import { useAuth } from '@/context/AuthContext';
+import { useGuardians } from '@/context/GuardianContext';
 import { useTripContext } from '@/context/TripContext';
 import { t, useLanguage } from '@/i18n';
 import { getCurrentLocation, type LocationFix } from '@/services/location.service';
@@ -25,7 +25,7 @@ export default function SosActiveScreen() {
   const sosId = params.sosId ?? activeSosId ?? '';
 
   const sosState = useSosStatus(sosId);
-  const { data: guardians } = useListGuardians();
+  const { guardians } = useGuardians();
   const [currentCoord, setCurrentCoord] = React.useState<{ lat: number; lng: number }>({
     lat: 28.6139,
     lng: 77.209,
@@ -144,14 +144,17 @@ export default function SosActiveScreen() {
             })
           ) : (
             <View style={styles.demoDeliveryBox}>
-              <View style={styles.demoRow}>
-                <Text style={styles.demoGuardian}>Mom (SMS · Push)</Text>
-                <Text style={styles.demoStatus}>DISPATCHED</Text>
-              </View>
-              <View style={styles.demoRow}>
-                <Text style={styles.demoGuardian}>Aanya (SMS · Telegram)</Text>
-                <Text style={styles.demoStatus}>DELIVERED</Text>
-              </View>
+              {(guardians && guardians.length > 0) ? guardians.map((g) => (
+                <View key={g.id} style={styles.demoRow}>
+                  <Text style={styles.demoGuardian}>{g.name} (SMS)</Text>
+                  <Text style={styles.demoStatus}>SENDING</Text>
+                </View>
+              )) : (
+                <View style={styles.demoRow}>
+                  <Text style={styles.demoGuardian}>Alerting emergency contacts…</Text>
+                  <Text style={styles.demoStatus}>PENDING</Text>
+                </View>
+              )}
             </View>
           )}
         </View>

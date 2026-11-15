@@ -14,9 +14,6 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import {
-  useAddGuardian,
-  useListGuardians,
-  useRemoveGuardian,
   type AddGuardianRequestChannelsItem,
   type Guardian,
 } from '@workspace/api-client-react';
@@ -24,39 +21,13 @@ import { normalizePhoneE164 } from '@workspace/safety-core';
 import BottomNav from '@/components/BottomNav';
 import BrandHeader from '@/components/BrandHeader';
 import Colors, { Palette } from '@/constants/colors';
+import { useGuardians } from '@/context/GuardianContext';
 import { t, useLanguage } from '@/i18n';
-
-// Seed demo guardians to match prototype image exactly if server list is empty
-const DEMO_GUARDIANS: Guardian[] = [
-  {
-    id: 'demo-1',
-    name: 'Mom',
-    phoneE164: '+919876543210',
-    relationship: 'Family',
-    channels: ['sms', 'telegram'],
-    consentStatus: 'granted',
-    createdAt: Date.now() - 86400000,
-  },
-  {
-    id: 'demo-2',
-    name: 'Aanya',
-    phoneE164: '+919811122233',
-    relationship: 'Friend',
-    channels: ['sms', 'email'],
-    consentStatus: 'granted',
-    createdAt: Date.now() - 43200000,
-  },
-];
 
 export default function GuardiansScreen() {
   useLanguage();
   const insets = useSafeAreaInsets();
-  const { data: serverGuardians = [], isLoading, refetch } = useListGuardians();
-  const addMutation = useAddGuardian();
-  const removeMutation = useRemoveGuardian();
-
-  // Combine server guardians with demo guardians for prototype fidelity
-  const guardians = serverGuardians.length > 0 ? serverGuardians : DEMO_GUARDIANS;
+  const { guardians, isLoading, addGuardian, removeGuardian } = useGuardians();
 
   const [addModalOpen, setAddModalOpen] = useState(false);
   const [prefModalOpen, setPrefModalOpen] = useState(false);
@@ -86,23 +57,17 @@ export default function GuardiansScreen() {
     }
 
     try {
-      await addMutation.mutateAsync({
-        data: {
-          name: name.trim(),
-          phoneE164,
-          relationship: relationship.trim() || 'Guardian',
-          channels: ['sms'],
-        },
+      await addGuardian({
+        name: name.trim(),
+        phoneE164,
+        relationship: relationship.trim() || 'Guardian',
+        channels: ['sms'],
       });
       setName('');
       setPhone('');
       setAddModalOpen(false);
-      await refetch();
-    } catch {
-      // Local fallback for demo mode
-      setName('');
-      setPhone('');
-      setAddModalOpen(false);
+    } catch (err: unknown) {
+      setFormError(err instanceof Error ? err.message : 'Failed to add guardian');
     }
   };
 
@@ -113,7 +78,7 @@ export default function GuardiansScreen() {
         text: 'Remove',
         style: 'destructive',
         onPress: () => {
-          void removeMutation.mutateAsync({ id: g.id }).then(() => refetch()).catch(() => undefined);
+          void removeGuardian(g.id);
         },
       },
     ]);
@@ -150,38 +115,63 @@ export default function GuardiansScreen() {
 
           {/* List of Guardians */}
           <View style={styles.guardiansList}>
-            {guardians.map((g, idx) => {
-              const initial = g.name.charAt(0).toUpperCase();
-              const isLast = idx === guardians.length - 1;
-
-              return (
-                <View key={g.id}>
-                  <TouchableOpacity
-                    style={styles.guardianRow}
-                    onLongPress={() => handleRemove(g)}
-                    activeOpacity={0.7}
-                  >
-                    <View style={styles.avatarBubble}>
-                      <Text style={styles.avatarText}>{initial}</Text>
-                    </View>
-
-                    <View style={styles.guardianInfoCol}>
-                      <Text style={styles.guardianName}>{g.name}</Text>
-                      <Text style={styles.guardianRole}>
-                        {g.relationship || t('guardians.title')} · Demo contact
-                      </Text>
-                    </View>
-
-                    <View style={styles.activePill}>
-                      <View style={styles.activeDot} />
-                      <Text style={styles.activeText}>{t('guardians.active')}</Text>
-                    </View>
-                  </TouchableOpacity>
-
-                  {!isLast && <View style={styles.divider} />}
+            {guardians.length === 0 ? (
+              <View style={styles.emptyContainer}>
+                <View style={styles.emptyIconWrap}>
+                  <Feather name="shield" size={30} color={Palette.primaryViolet} />
                 </View>
-              );
-            })}
+                <Text style={styles.emptyTitle}>Your Circle is Empty</Text>
+                <Text style={styles.emptyDesc}>
+                  Add 2 to 5 trusted family members or friends. They will receive live GPS tracking links and emergency SMS alerts during your trips or SOS.
+                </Text>
+                <TouchableOpacity
+                  style={styles.emptyAddBtn}
+                  onPress={() => setAddModalOpen(true)}
+                  activeOpacity={0.85}
+                >
+                  <Feather name="plus-circle" size={18} color="#FFFFFF" />
+                  <Text style={styles.emptyAddBtnText}>Add First Guardian</Text>
+                </TouchableOpacity>
+              </View>
+            ) : (
+              guardians.map((g, idx) => {
+                const initial = g.name.charAt(0).toUpperCase();
+                const isLast = idx === guardians.length - 1;
+
+                return (
+                  <View key={g.id}>
+                    <View style={styles.guardianRow}>
+                      <View style={styles.avatarBubble}>
+                        <Text style={styles.avatarText}>{initial}</Text>
+                      </View>
+
+                      <View style={styles.guardianInfoCol}>
+                        <Text style={styles.guardianName}>{g.name}</Text>
+                        <Text style={styles.guardianRole}>
+                          {g.relationship || 'Guardian'} · {g.phoneE164}
+                        </Text>
+                      </View>
+
+                      <View style={styles.guardianRowActions}>
+                        <View style={styles.activePill}>
+                          <View style={styles.activeDot} />
+                          <Text style={styles.activeText}>SMS Alert</Text>
+                        </View>
+                        <TouchableOpacity
+                          style={styles.deleteIconButton}
+                          onPress={() => handleRemove(g)}
+                          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                        >
+                          <Feather name="trash-2" size={18} color={Palette.sosRed} />
+                        </TouchableOpacity>
+                      </View>
+                    </View>
+
+                    {!isLast && <View style={styles.divider} />}
+                  </View>
+                );
+              })
+            )}
           </View>
         </View>
 
@@ -557,5 +547,56 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: Palette.secondaryText,
     marginTop: 2,
+  },
+  emptyContainer: {
+    paddingVertical: 24,
+    paddingHorizontal: 16,
+    alignItems: 'center',
+    gap: 10,
+  },
+  emptyIconWrap: {
+    width: 54,
+    height: 54,
+    borderRadius: 27,
+    backgroundColor: 'rgba(124, 92, 255, 0.12)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 4,
+  },
+  emptyTitle: {
+    fontSize: 17,
+    fontWeight: '700',
+    color: Palette.primaryText,
+  },
+  emptyDesc: {
+    fontSize: 13,
+    color: Palette.secondaryText,
+    textAlign: 'center',
+    lineHeight: 18,
+  },
+  emptyAddBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: Palette.primaryViolet,
+    paddingHorizontal: 18,
+    paddingVertical: 12,
+    borderRadius: 12,
+    marginTop: 6,
+  },
+  emptyAddBtnText: {
+    color: '#FFFFFF',
+    fontWeight: '700',
+    fontSize: 14,
+  },
+  guardianRowActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  deleteIconButton: {
+    padding: 6,
+    borderRadius: 8,
+    backgroundColor: 'rgba(255, 68, 68, 0.1)',
   },
 });

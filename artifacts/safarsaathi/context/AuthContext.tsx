@@ -88,8 +88,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     } catch (err) {
       // Offline / demo fallback when Firebase is offline or demo credentials are used
       if (email && password) {
+        const userUid = `user_${email.trim().toLowerCase().replace(/[^a-z0-9]/g, '_')}`;
         const demoUser = {
-          uid: 'demo-user-1',
+          uid: userUid,
           email,
           getIdToken: async () => 'demo-bearer-token',
         } as unknown as User;
@@ -109,8 +110,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     } catch (err) {
       // Offline / demo fallback
       if (email && password) {
+        const userUid = `user_${email.trim().toLowerCase().replace(/[^a-z0-9]/g, '_')}`;
         const demoUser = {
-          uid: 'demo-user-1',
+          uid: userUid,
           email,
           getIdToken: async () => 'demo-bearer-token',
         } as unknown as User;
